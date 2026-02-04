@@ -1,0 +1,35 @@
+# NeuroRegen simulation config — edit these to change runs without touching code.
+
+simulation:
+  sim_time: 1800.0    # 30 minutes (s)
+  dt: 0.1             # time step (s)
+  pulse_freq: 5.0     # Hz
+  pulse_width: 0.02   # s ON per pulse
+
+thermal:
+  h_conv: 10.0        # convective heat transfer (W/m²/K)
+  t_amb_c: 22.0       # ambient temperature (°C)
+  temp_limit_f: 75.0  # skip pulses above this (°F)
+  hyst_f: 0.7         # resume below (temp_limit_f - hyst_f) (°F)
+
+depth:
+  z_max_m: 0.03       # max depth evaluated (m), 3 cm
+  z_points: 300       # points along z for B-field
+  b_threshold_t: 1e-4 # B-field threshold (T) for effective depth
+
+axes:
+  - name: X
+    wire_mm: 1.2
+    loop_mm: 80
+    turns: 20
+    pulse_power_w: 45
+  - name: Y
+    wire_mm: 1.2
+    loop_mm: 80
+    turns: 20
+    pulse_power_w: 45
+  - name: Z
+    wire_mm: 1.2
+    loop_mm: 80
+    turns: 20
+    pulse_power_w: 45
