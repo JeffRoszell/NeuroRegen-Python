@@ -18,6 +18,7 @@ from src.neuroregen.constants import T_AMB_C, B_THRESHOLD_T
 
 try:
     from src.neuroregen.config_loader import load_config
+
     HAS_CONFIG = True
 except ImportError:
     HAS_CONFIG = False
@@ -31,6 +32,7 @@ try:
         plot_field_interactive_slice,
         plot_targeting_volume,
     )
+
     HAS_FIELD_MAPS = True
 except ImportError:
     HAS_FIELD_MAPS = False
@@ -39,7 +41,8 @@ except ImportError:
 def main():
     parser = argparse.ArgumentParser(description="Run NeuroRegen 3-axis pulsed simulation.")
     parser.add_argument(
-        "-c", "--config",
+        "-c",
+        "--config",
         default=None,
         help="Path to YAML config (default: config/default.yaml)",
     )
@@ -69,7 +72,9 @@ def main():
                 if isinstance(e, ImportError):
                     print("Warning: PyYAML not installed. Using default parameters.")
                 else:
-                    print(f"Warning: Config file not found: {args.config}. Using default parameters.")
+                    print(
+                        f"Warning: Config file not found: {args.config}. Using default parameters."
+                    )
                 config = None
         else:
             config_path = os.path.join(ROOT, "config", "default.yaml")
@@ -85,7 +90,10 @@ def main():
     output_dir = os.path.join(ROOT, "outputs")
     t, T, P, depth = run_simulation(config=config)
     plot_and_save(
-        t, T, P, depth,
+        t,
+        T,
+        P,
+        depth,
         output_dir=output_dir,
         show=True,
         temp_limit_f=config["temp_limit_f"] if config else None,
@@ -100,10 +108,10 @@ def main():
         if not HAS_FIELD_MAPS:
             print("Warning: Field mapping not available. Install required dependencies.")
         else:
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print("Generating spatial B-field maps...")
-            print("="*60)
-            
+            print("=" * 60)
+
             # Get parameters from config or use defaults
             if config:
                 axes = config["axes"]
@@ -115,10 +123,10 @@ def main():
                 Pin = axes[0].pulse_power_w
                 T_c = T_AMB_C
                 threshold = B_THRESHOLD_T
-            
+
             field_maps_dir = os.path.join(output_dir, "field_maps")
             os.makedirs(field_maps_dir, exist_ok=True)
-            
+
             # Create spatial grid
             X, Y, Z, _ = create_spatial_grid(
                 x_range=(-0.05, 0.05),
@@ -132,20 +140,20 @@ def main():
             y_coords = np.linspace(-0.05, 0.05, 50)
             z_coords = np.linspace(0, 0.03, 30)
             z_slices_mm = [5, 10, 15, 20, 25]
-            
+
             for axis in axes:
                 print(f"\nProcessing {axis.name}-axis...")
                 print(f"  Calculating B-field map at {Pin} W, {T_c:.1f}°C...")
-                
+
                 # Calculate field map
                 B_mag = calculate_field_map(axis, Pin, T_c, X, Y, Z)
-                
-                print(f"  B-field range: {B_mag.min()*1e4:.3f} - {B_mag.max()*1e4:.3f} mT")
-                
+
+                print(f"  B-field range: {B_mag.min() * 1e4:.3f} - {B_mag.max() * 1e4:.3f} mT")
+
                 # Calculate global B-field bounds for fixed color scale
                 B_min = B_mag[B_mag > 0].min() + 1e-6
                 B_max = B_mag.max() + 1e-6
-                
+
                 # 2D contour plots at multiple depths
                 print(f"  Generating 2D contour plots at {len(z_slices_mm)} depths...")
                 for z_mm in z_slices_mm:
@@ -166,10 +174,10 @@ def main():
                         vmin=B_min,
                         vmax=B_max,
                     )
-                
+
                 # Interactive depth-slice plot
                 if not args.no_interactive:
-                    print(f"  Generating interactive depth-slice plot...")
+                    print("  Generating interactive depth-slice plot...")
                     plot_field_interactive_slice(
                         B_mag,
                         x_coords,
@@ -183,9 +191,9 @@ def main():
                         vmin=B_min,
                         vmax=B_max,
                     )
-                
+
                 # 3D targeting volume
-                print(f"  Generating 3D targeting volume visualization...")
+                print("  Generating 3D targeting volume visualization...")
                 plot_targeting_volume(
                     B_mag,
                     x_coords,
@@ -193,12 +201,10 @@ def main():
                     z_coords,
                     axis.name,
                     threshold=threshold,
-                    output_path=os.path.join(
-                        field_maps_dir, f"{axis.name.lower()}_volume_3d.png"
-                    ),
+                    output_path=os.path.join(field_maps_dir, f"{axis.name.lower()}_volume_3d.png"),
                     show=False,
                 )
-            
+
             print(f"\nAll field maps saved to {field_maps_dir}/")
 
 

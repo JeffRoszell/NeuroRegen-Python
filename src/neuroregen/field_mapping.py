@@ -9,11 +9,10 @@ effective stimulation regions (where B-field exceeds threshold).
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
-from mpl_toolkits.mplot3d import Axes3D
 from typing import Optional
 
 from .constants import MU0, B_THRESHOLD_T
-from .coil import Axis, coil_geom, resistance, B_loop
+from .coil import Axis, coil_geom, resistance
 
 
 def B_field_3d_loop(
@@ -276,14 +275,14 @@ def plot_field_contours_2d(
             colors="red",
             linewidths=2,
             linestyles="--",
-            label=f"Effective region (B ≥ {threshold*1e4:.2f} mT)",
+            label=f"Effective region (B ≥ {threshold * 1e4:.2f} mT)",
         )
 
     ax.set_xlabel("X position (mm)", fontsize=12)
     ax.set_ylabel("Y position (mm)", fontsize=12)
     ax.set_title(
-        f"{axis_name}-axis B-field at z = {z_slice*1000:.1f} mm\n"
-        f"Effective stimulation region (B ≥ {threshold*1e4:.2f} mT)",
+        f"{axis_name}-axis B-field at z = {z_slice * 1000:.1f} mm\n"
+        f"Effective stimulation region (B ≥ {threshold * 1e4:.2f} mT)",
         fontsize=14,
     )
     ax.grid(True, alpha=0.3)
@@ -359,13 +358,13 @@ def plot_field_interactive_slice(
         colors="red",
         linewidths=2,
         linestyles="--",
-        label=f"Effective region (B ≥ {threshold*1e4:.2f} mT)",
+        label=f"Effective region (B ≥ {threshold * 1e4:.2f} mT)",
     )
 
     ax.set_xlabel("X position (mm)", fontsize=12)
     ax.set_ylabel("Y position (mm)", fontsize=12)
     title = ax.set_title(
-        f"{axis_name}-axis B-field at z = {z_coords[z_idx]*1000:.1f} mm",
+        f"{axis_name}-axis B-field at z = {z_coords[z_idx] * 1000:.1f} mm",
         fontsize=14,
     )
     ax.grid(True, alpha=0.3)
@@ -388,14 +387,14 @@ def plot_field_interactive_slice(
         z_val = slider.val / 1000
         z_idx = np.argmin(np.abs(z_coords - z_val))
         B_slice = B_mag[:, :, z_idx]
-        
+
         # Remove old colorbar before clearing axes
         try:
             if cbar is not None:
                 cbar.remove()
-        except:
+        except Exception:
             pass
-        
+
         # Use fixed scale (vmin/vmax from outer scope) to show degradation
         ax.clear()
         cs = ax.contourf(
@@ -403,7 +402,7 @@ def plot_field_interactive_slice(
         )
         # Recreate colorbar with fixed scale
         cbar = plt.colorbar(cs, ax=ax, label="B-field magnitude (T)")
-        
+
         ax.contour(
             X * 1000,
             Y * 1000,
@@ -412,13 +411,15 @@ def plot_field_interactive_slice(
             colors="red",
             linewidths=2,
             linestyles="--",
-            label=f"Effective region (B ≥ {threshold*1e4:.2f} mT)",
+            label=f"Effective region (B ≥ {threshold * 1e4:.2f} mT)",
         )
         ax.legend()
         ax.set_xlabel("X position (mm)", fontsize=12)
         ax.set_ylabel("Y position (mm)", fontsize=12)
         # Recreate title after clear()
-        ax.set_title(f"{axis_name}-axis B-field at z = {z_coords[z_idx]*1000:.1f} mm", fontsize=14)
+        ax.set_title(
+            f"{axis_name}-axis B-field at z = {z_coords[z_idx] * 1000:.1f} mm", fontsize=14
+        )
         ax.grid(True, alpha=0.3)
         ax.set_aspect("equal")
         fig.canvas.draw_idle()
@@ -483,7 +484,7 @@ def plot_targeting_volume(
             cmap="hot",
             s=10,
             alpha=0.6,
-            label=f"Effective region (B ≥ {threshold*1e4:.2f} mT)",
+            label=f"Effective region (B ≥ {threshold * 1e4:.2f} mT)",
         )
         plt.colorbar(scatter, ax=ax, label="B-field magnitude (T)")
 
@@ -492,7 +493,7 @@ def plot_targeting_volume(
     ax.set_zlabel("Depth (mm)", fontsize=12)
     ax.set_title(
         f"{axis_name}-axis Effective Stimulation Volume\n"
-        f"(B-field ≥ {threshold*1e4:.2f} mT threshold)",
+        f"(B-field ≥ {threshold * 1e4:.2f} mT threshold)",
         fontsize=14,
     )
     ax.legend()

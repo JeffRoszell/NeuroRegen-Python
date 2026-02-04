@@ -97,6 +97,7 @@ class Controller:
         if self.log_run and self.csv_dir:
             os.makedirs(self.csv_dir, exist_ok=True)
             from datetime import datetime
+
             base = datetime.now().strftime("%Y%m%d_%H%M%S")
             self.csv_path = os.path.join(self.csv_dir, f"run_{base}.csv")
             csv_handle = open_log(self.csv_path, include_state=True)

@@ -22,9 +22,15 @@ def open_log(
     writer = csv.writer(f)
     header = [
         "t_s",
-        "T_X_C", "T_Y_C", "T_Z_C",
-        "P_X_W", "P_Y_W", "P_Z_W",
-        "depth_X_cm", "depth_Y_cm", "depth_Z_cm",
+        "T_X_C",
+        "T_Y_C",
+        "T_Z_C",
+        "P_X_W",
+        "P_Y_W",
+        "P_Z_W",
+        "depth_X_cm",
+        "depth_Y_cm",
+        "depth_Z_cm",
     ]
     if include_state:
         header.append("state")
@@ -49,9 +55,18 @@ class CSVLogger:
         state: Optional[str] = None,
     ) -> None:
         """Write one row. T, P, depth are 1D arrays of length 3 (X, Y, Z)."""
-        row = [t, float(T[0]), float(T[1]), float(T[2]),
-               float(P[0]), float(P[1]), float(P[2]),
-               float(depth[0]), float(depth[1]), float(depth[2])]
+        row = [
+            t,
+            float(T[0]),
+            float(T[1]),
+            float(T[2]),
+            float(P[0]),
+            float(P[1]),
+            float(P[2]),
+            float(depth[0]),
+            float(depth[1]),
+            float(depth[2]),
+        ]
         if self._include_state and state is not None:
             row.append(state)
         elif self._include_state:

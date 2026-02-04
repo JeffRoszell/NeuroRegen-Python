@@ -18,7 +18,6 @@ except ImportError:
 
 from src.neuroregen.controller import Controller
 from src.neuroregen.state_machine import ControllerState
-from src.neuroregen.coil import c_to_f
 
 
 def load_config_or_default():
@@ -27,6 +26,7 @@ def load_config_or_default():
         return load_config(config_path)
     # Minimal default config
     from src.neuroregen.simulation import default_axes
+
     return {
         "sim_time": 1800.0,
         "dt": 0.1,
@@ -57,7 +57,7 @@ def print_status(ctrl: Controller):
 def print_pulse_config(ctrl: Controller):
     """Display pulse definition and axis power from config."""
     c = ctrl.config
-    print(f"\n  Pulse: {c['pulse_freq']} Hz, width {c['pulse_width']*1000:.0f} ms")
+    print(f"\n  Pulse: {c['pulse_freq']} Hz, width {c['pulse_width'] * 1000:.0f} ms")
     print("  Axis power (W):", end="")
     for a in c["axes"]:
         print(f"  {a.name}={a.pulse_power_w}", end="")
@@ -72,7 +72,6 @@ def toggle_axis(ctrl: Controller, i: int):
 
 
 def run_firing_with_live_plot(ctrl: Controller, live: bool):
-    import threading
     try:
         import matplotlib.pyplot as plt
         from src.neuroregen.plotting import live_plot_init
@@ -109,7 +108,10 @@ def main():
         print("\n  Commands:")
         print("    A = Arm (OFF -> ARMED)   S = Start (ARMED -> FIRING, run simulation)")
         print("    P = Stop (FIRING -> OFF) C = Clear fault (FAULT -> OFF)   Q = Quit")
-        print("    E = Toggle axis (X/Y/Z)  D = Display pulse/axis config   L = Toggle live plot for next run" + live_hint)
+        print(
+            "    E = Toggle axis (X/Y/Z)  D = Display pulse/axis config   L = Toggle live plot for next run"
+            + live_hint
+        )
         try:
             line = input("\n  Choice: ").strip().upper() or " "
             cmd = line[0]
@@ -159,7 +161,11 @@ def main():
             print_pulse_config(ctrl)
         elif cmd == "L":
             live_plot_next = not live_plot_next
-            print("  Live plot for next Start: ON." if live_plot_next else "  Live plot for next Start: OFF.")
+            print(
+                "  Live plot for next Start: ON."
+                if live_plot_next
+                else "  Live plot for next Start: OFF."
+            )
         else:
             print("  Unknown command.")
 

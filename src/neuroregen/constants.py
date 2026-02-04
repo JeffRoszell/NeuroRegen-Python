@@ -26,7 +26,7 @@ Z_POINTS = 300
 B_THRESHOLD_T = 1e-4
 
 # --- Simulation ---
-SIM_TIME = 1800.0   # 30 minutes (s)
-DT = 0.1            # time step (s)
-PULSE_FREQ = 5.0    # Hz
+SIM_TIME = 1800.0  # 30 minutes (s)
+DT = 0.1  # time step (s)
+PULSE_FREQ = 5.0  # Hz
 PULSE_WIDTH = 0.02  # s ON per pulse

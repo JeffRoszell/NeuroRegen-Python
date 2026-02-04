@@ -94,15 +94,28 @@ On Windows, if `python` doesn’t work, try: `py -3 scripts/run_simulation.py`.
 
 ### Menu-driven controller (interactive)
 
-For a **state-machine–driven interface** with OFF → ARMED → FIRING → FAULT, axis enable/disable, **live plotting**, and **CSV data logging**:
+For a **state-machine–driven interface** with axis enable/disable, **live plotting**, and **CSV data logging**:
 
 ```bash
 python scripts/run_interactive.py
 ```
 
+**State machine (OFF, ARMED, FIRING, FAULT):**
+
+| State   | Meaning |
+|--------|---------|
+| **OFF**   | System idle. Arm to prepare for a run. |
+| **ARMED** | Ready to fire. Start to run the simulation. |
+| **FIRING**| Simulation running. Stops when time ends, you press Stop, or a fault occurs. |
+| **FAULT** | Safety fault (e.g. over-temperature). Press **C** to clear before arming again. |
+
+Valid transitions: OFF ↔ ARMED, ARMED → FIRING, FIRING → OFF (stop) or FIRING → FAULT (e.g. over-temp), FAULT → OFF (clear).
+
+**Commands:**
+
 - **A** = Arm (OFF → ARMED)  
-- **S** = Start (run simulation; optionally enable **L** first for live plot)  
-- **P** = Stop (request stop during run)  
+- **S** = Start (ARMED → FIRING; run simulation; optionally enable **L** first for live plot)  
+- **P** = Stop (request stop during run; FIRING → OFF)  
 - **C** = Clear fault (FAULT → OFF)  
 - **E** then **X**/**Y**/**Z** = Toggle that axis on/off  
 - **D** = Display pulse and axis power config  
@@ -189,3 +202,11 @@ python -m pytest tests/ -v
 ```
 
 (On Windows, use `python` or `py -3` as above.) You should see several tests listed and “passed” for each.
+
+**Optional: run tests before every commit** — From the project root, run once:
+
+```bash
+cp scripts/pre-commit.hook .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+```
+
+After that, `git commit` will run the test suite first and block the commit if any test fails.

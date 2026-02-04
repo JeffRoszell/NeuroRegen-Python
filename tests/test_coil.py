@@ -2,12 +2,12 @@
 Unit tests for coil geometry, resistance, B-field, and depth.
 """
 
-import pytest
 import numpy as np
 
 # Add project root so we can import src
 import sys
 import os
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
@@ -16,7 +16,6 @@ from src.neuroregen.coil import (
     coil_geom,
     resistance,
     B_loop,
-    effective_depth_cm,
     c_to_f,
     f_to_c,
 )

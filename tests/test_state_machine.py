@@ -1,6 +1,5 @@
 """Tests for the controller finite-state machine."""
 
-import pytest
 from src.neuroregen.state_machine import (
     ControllerState,
     can_transition,
@@ -32,7 +31,9 @@ def test_armed_to_firing():
 
 def test_firing_to_fault():
     assert can_transition(ControllerState.FIRING, ControllerState.FAULT)
-    s, r = transition(ControllerState.FIRING, ControllerState.FAULT, fault_reason="over_temperature")
+    s, r = transition(
+        ControllerState.FIRING, ControllerState.FAULT, fault_reason="over_temperature"
+    )
     assert s == ControllerState.FAULT
     assert r == "over_temperature"
 

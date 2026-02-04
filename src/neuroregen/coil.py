@@ -10,7 +10,6 @@ from .constants import (
     RHO_CU,
     ALPHA_CU,
     DENSITY_CU,
-    CP_CU,
     Z_MAX_M,
     Z_POINTS,
     B_THRESHOLD_T,
@@ -55,9 +54,7 @@ def B_loop(I: float, R: float, z: np.ndarray, N: int) -> np.ndarray:
     return MU0 * I * R**2 / (2 * (R**2 + z**2) ** 1.5) * N
 
 
-def effective_depth_cm(
-    Pin: float, L: float, A: float, R: float, N: int, T_c: float
-) -> float:
+def effective_depth_cm(Pin: float, L: float, A: float, R: float, N: int, T_c: float) -> float:
     """
     Effective penetration depth (cm) for given power Pin (W), geometry, and coil temp T_c (°C).
     Depth is max z where B >= B_THRESHOLD_T, capped at Z_MAX_M (3 cm).

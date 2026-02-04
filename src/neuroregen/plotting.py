@@ -117,30 +117,32 @@ def plot_and_save(
     resume_f = limit_f - hyst
 
     if animate:
-        _plot_animated(t, T, P, depth, output_dir, limit_f, resume_f, z_max, animation_duration, show)
+        _plot_animated(
+            t, T, P, depth, output_dir, limit_f, resume_f, z_max, animation_duration, show
+        )
     else:
         _plot_static(t_min, T, P, depth, output_dir, limit_f, resume_f, z_max, show)
 
 
-def _plot_static(
-    t_min, T, P, depth, output_dir, limit_f, resume_f, z_max, show
-):
+def _plot_static(t_min, T, P, depth, output_dir, limit_f, resume_f, z_max, show):
     """Create static plots (original behavior)."""
     axis_names = ["X", "Y", "Z"]
     colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
 
     fig, axes = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
-    
+
     for i, (ax, name, color) in enumerate(zip(axes, axis_names, colors)):
         ax.plot(t_min, c_to_f(T[:, i]), label=f"{name}-axis", linewidth=1.5, color=color)
         ax.axhspan(resume_f, limit_f, alpha=0.2, color="orange", label="Hysteresis band")
         ax.axhline(limit_f, ls="--", color="red", linewidth=2, label=f"Thermal limit: {limit_f}°F")
         ax.axhline(resume_f, ls=":", color="orange", linewidth=1.5, label=f"Resume: {resume_f}°F")
         ax.set_ylabel("Temperature (°F)", fontsize=11)
-        ax.set_title(f"{name}-axis Temperature with Thermal Safety Limits", fontsize=12, fontweight="bold")
+        ax.set_title(
+            f"{name}-axis Temperature with Thermal Safety Limits", fontsize=12, fontweight="bold"
+        )
         ax.legend(loc="best", fontsize=9)
         ax.grid(True, alpha=0.3)
-    
+
     axes[-1].set_xlabel("Time (min)", fontsize=12)
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "temperature.png"), dpi=150)
@@ -155,7 +157,7 @@ def _plot_static(
         ax.set_title(f"{name}-axis Power Pattern", fontsize=12, fontweight="bold")
         ax.legend(loc="best", fontsize=9)
         ax.grid(True, alpha=0.3)
-    
+
     axes[-1].set_xlabel("Time (min)", fontsize=12)
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "power.png"), dpi=150)
@@ -165,17 +167,32 @@ def _plot_static(
     # Depth plot with depth safety limit - subplots for each axis
     fig, axes = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
     depth_limit_cm = z_max * 100
-    
+
     for i, (ax, name, color) in enumerate(zip(axes, axis_names, colors)):
         ax.plot(t_min, depth[:, i], label=f"{name} depth", linewidth=1.5, color=color)
-        ax.axhline(depth_limit_cm, ls="--", color="red", linewidth=2, label=f"Depth limit: {depth_limit_cm:.1f} cm")
-        ax.fill_between(t_min, depth_limit_cm, depth_limit_cm + 0.1, alpha=0.2, color="red", label="Safety limit zone")
+        ax.axhline(
+            depth_limit_cm,
+            ls="--",
+            color="red",
+            linewidth=2,
+            label=f"Depth limit: {depth_limit_cm:.1f} cm",
+        )
+        ax.fill_between(
+            t_min,
+            depth_limit_cm,
+            depth_limit_cm + 0.1,
+            alpha=0.2,
+            color="red",
+            label="Safety limit zone",
+        )
         ax.set_ylabel("Depth (cm)", fontsize=11)
-        ax.set_title(f"{name}-axis Penetration Depth with Safety Limit", fontsize=12, fontweight="bold")
+        ax.set_title(
+            f"{name}-axis Penetration Depth with Safety Limit", fontsize=12, fontweight="bold"
+        )
         ax.legend(loc="best", fontsize=9)
         ax.grid(True, alpha=0.3)
         ax.set_ylim(0, depth_limit_cm * 1.1)
-    
+
     axes[-1].set_xlabel("Time (min)", fontsize=12)
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "depth.png"), dpi=150)
@@ -188,19 +205,17 @@ def _plot_static(
         plt.close("all")
 
 
-def _plot_animated(
-    t, T, P, depth, output_dir, limit_f, resume_f, z_max, animation_duration, show
-):
+def _plot_animated(t, T, P, depth, output_dir, limit_f, resume_f, z_max, animation_duration, show):
     """Create animated plots that loop through the simulation data."""
     t_min = t / 60
     n = len(t)
     axis_names = ["X", "Y", "Z"]
     colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
     depth_limit_cm = z_max * 100
-    
+
     # Calculate frame interval (ms) to complete loop in animation_duration seconds
     interval_ms = (animation_duration * 1000) / n
-    
+
     # Temperature animation
     fig_temp, axes_temp = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
     temp_lines = []
@@ -208,30 +223,36 @@ def _plot_animated(
         ax.axhspan(resume_f, limit_f, alpha=0.2, color="orange", label="Hysteresis band")
         ax.axhline(limit_f, ls="--", color="red", linewidth=2, label=f"Thermal limit: {limit_f}°F")
         ax.axhline(resume_f, ls=":", color="orange", linewidth=1.5, label=f"Resume: {resume_f}°F")
-        line, = ax.plot([], [], label=f"{name}-axis", linewidth=1.5, color=color)
+        (line,) = ax.plot([], [], label=f"{name}-axis", linewidth=1.5, color=color)
         temp_lines.append(line)
         ax.set_ylabel("Temperature (°F)", fontsize=11)
-        ax.set_title(f"{name}-axis Temperature with Thermal Safety Limits", fontsize=12, fontweight="bold")
+        ax.set_title(
+            f"{name}-axis Temperature with Thermal Safety Limits", fontsize=12, fontweight="bold"
+        )
         ax.set_xlim(0, t_min[-1])
         ax.set_ylim(c_to_f(T.min()) - 2, c_to_f(T.max()) + 2)
         ax.legend(loc="best", fontsize=9)
         ax.grid(True, alpha=0.3)
     axes_temp[-1].set_xlabel("Time (min)", fontsize=12)
     plt.tight_layout()
-    
+
     def update_temp(frame):
         idx = frame % n
         for i, line in enumerate(temp_lines):
-            line.set_data(t_min[:idx+1], c_to_f(T[:idx+1, i]))
+            line.set_data(t_min[: idx + 1], c_to_f(T[: idx + 1, i]))
         return temp_lines
-    
-    anim_temp = FuncAnimation(fig_temp, update_temp, frames=n, interval=interval_ms, blit=True, repeat=True)
-    
+
+    anim_temp = FuncAnimation(
+        fig_temp, update_temp, frames=n, interval=interval_ms, blit=True, repeat=True
+    )
+
     # Power animation
     fig_power, axes_power = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
     power_lines = []
     for i, (ax, name, color) in enumerate(zip(axes_power, axis_names, colors)):
-        line, = ax.plot([], [], label=f"{name} pulses", linewidth=1.5, color=color, drawstyle="steps-post")
+        (line,) = ax.plot(
+            [], [], label=f"{name} pulses", linewidth=1.5, color=color, drawstyle="steps-post"
+        )
         power_lines.append(line)
         ax.set_ylabel("Applied Power (W)", fontsize=11)
         ax.set_title(f"{name}-axis Power Pattern", fontsize=12, fontweight="bold")
@@ -241,40 +262,59 @@ def _plot_animated(
         ax.grid(True, alpha=0.3)
     axes_power[-1].set_xlabel("Time (min)", fontsize=12)
     plt.tight_layout()
-    
+
     def update_power(frame):
         idx = frame % n
         for i, line in enumerate(power_lines):
-            line.set_data(t_min[:idx+1], P[:idx+1, i])
+            line.set_data(t_min[: idx + 1], P[: idx + 1, i])
         return power_lines
-    
-    anim_power = FuncAnimation(fig_power, update_power, frames=n, interval=interval_ms, blit=True, repeat=True)
-    
+
+    anim_power = FuncAnimation(
+        fig_power, update_power, frames=n, interval=interval_ms, blit=True, repeat=True
+    )
+
     # Depth animation
     fig_depth, axes_depth = plt.subplots(3, 1, figsize=(10, 12), sharex=True)
     depth_lines = []
     for i, (ax, name, color) in enumerate(zip(axes_depth, axis_names, colors)):
-        ax.axhline(depth_limit_cm, ls="--", color="red", linewidth=2, label=f"Depth limit: {depth_limit_cm:.1f} cm")
-        ax.fill_between(t_min, depth_limit_cm, depth_limit_cm + 0.1, alpha=0.2, color="red", label="Safety limit zone")
-        line, = ax.plot([], [], label=f"{name} depth", linewidth=1.5, color=color)
+        ax.axhline(
+            depth_limit_cm,
+            ls="--",
+            color="red",
+            linewidth=2,
+            label=f"Depth limit: {depth_limit_cm:.1f} cm",
+        )
+        ax.fill_between(
+            t_min,
+            depth_limit_cm,
+            depth_limit_cm + 0.1,
+            alpha=0.2,
+            color="red",
+            label="Safety limit zone",
+        )
+        (line,) = ax.plot([], [], label=f"{name} depth", linewidth=1.5, color=color)
         depth_lines.append(line)
         ax.set_ylabel("Depth (cm)", fontsize=11)
-        ax.set_title(f"{name}-axis Penetration Depth with Safety Limit", fontsize=12, fontweight="bold")
+        ax.set_title(
+            f"{name}-axis Penetration Depth with Safety Limit", fontsize=12, fontweight="bold"
+        )
         ax.set_xlim(0, t_min[-1])
         ax.set_ylim(0, depth_limit_cm * 1.1)
         ax.legend(loc="best", fontsize=9)
         ax.grid(True, alpha=0.3)
     axes_depth[-1].set_xlabel("Time (min)", fontsize=12)
     plt.tight_layout()
-    
+
     def update_depth(frame):
         idx = frame % n
         for i, line in enumerate(depth_lines):
-            line.set_data(t_min[:idx+1], depth[:idx+1, i])
+            line.set_data(t_min[: idx + 1], depth[: idx + 1, i])
         return depth_lines
-    
-    anim_depth = FuncAnimation(fig_depth, update_depth, frames=n, interval=interval_ms, blit=True, repeat=True)
-    
+
+    anim_depth = FuncAnimation(
+        fig_depth, update_depth, frames=n, interval=interval_ms, blit=True, repeat=True
+    )
+
     if show:
         plt.show()
     else:
@@ -283,12 +323,12 @@ def _plot_animated(
             line.set_data(t_min, c_to_f(T[:, i]))
         plt.savefig(os.path.join(output_dir, "temperature.png"), dpi=150)
         plt.close(fig_temp)
-        
+
         for i, line in enumerate(power_lines):
             line.set_data(t_min, P[:, i])
         plt.savefig(os.path.join(output_dir, "power.png"), dpi=150)
         plt.close(fig_power)
-        
+
         for i, line in enumerate(depth_lines):
             line.set_data(t_min, depth[:, i])
         plt.savefig(os.path.join(output_dir, "depth.png"), dpi=150)

@@ -1,0 +1,24 @@
+[project]
+name = "neuroregen"
+version = "0.1.0"
+description = "3-axis pulsed coil simulation with thermal and depth modeling"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+# Scripts/tests modify sys.path before importing; allow that.
+[tool.ruff.lint.per-file-ignores]
+"scripts/*" = ["E402"]
+"tests/*" = ["E402"]
+
+# I = current (A) is standard in physics
+[tool.ruff.lint]
+ignore = ["E741", "F841"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

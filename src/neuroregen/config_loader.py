@@ -27,7 +27,7 @@ def load_config(path: str | os.PathLike | None = None) -> dict:
     if path is None:
         # Default: config/default.yaml relative to repo root (parent of src/)
         pkg_dir = Path(__file__).resolve().parent  # .../src/neuroregen
-        root = pkg_dir.parent.parent               # .../Python Code
+        root = pkg_dir.parent.parent  # .../Python Code
         path = root / "config" / "default.yaml"
 
     path = Path(path)

@@ -100,9 +100,7 @@ def run_simulation(
             if Pin > 0:
                 I = np.sqrt(Pin / resistance(L, A, T[k - 1, i]))
                 Bz = B_loop(I, R, z, a.turns)
-                depth[k, i] = (
-                    z[Bz >= b_threshold_t][-1] * 100 if np.any(Bz >= b_threshold_t) else 0
-                )
+                depth[k, i] = z[Bz >= b_threshold_t][-1] * 100 if np.any(Bz >= b_threshold_t) else 0
             else:
                 depth[k, i] = 0.0
 
@@ -120,8 +118,8 @@ def _sim_params_from_config(config: dict | None):
         Z_MAX_M,
         Z_POINTS,
         B_THRESHOLD_T,
-        CP_CU,
     )
+
     if config is not None:
         return {
             "sim_time": config["sim_time"],
@@ -223,9 +221,7 @@ def run_simulation_stepwise(
             if Pin > 0:
                 I = np.sqrt(Pin / resistance(L, A, T[k - 1, i]))
                 Bz = B_loop(I, R, z, a.turns)
-                depth[k, i] = (
-                    z[Bz >= b_threshold_t][-1] * 100 if np.any(Bz >= b_threshold_t) else 0
-                )
+                depth[k, i] = z[Bz >= b_threshold_t][-1] * 100 if np.any(Bz >= b_threshold_t) else 0
             else:
                 depth[k, i] = 0.0
         last_k = k
