@@ -94,11 +94,26 @@ On Windows, if `python` doesn’t work, try: `py -3 scripts/run_simulation.py`.
 
 ### Menu-driven controller (interactive)
 
-For a **state-machine–driven interface** with axis enable/disable, **live plotting**, and **CSV data logging**:
+The **state machine** lets you Arm, Start, Stop, and clear faults from a menu. It supports axis enable/disable, **live plotting**, and **CSV data logging**.
 
-```bash
-python scripts/run_interactive.py
-```
+**How to run the state machine:**
+
+1. In the project folder with `(venv)` active, run:
+   ```bash
+   python scripts/run_interactive.py
+   ```
+   On Windows, use `py -3 scripts/run_interactive.py` if needed.
+
+2. You start in **OFF**. To run a simulation:
+   - Type **A** and Enter to **Arm** (OFF → ARMED).
+   - Type **S** and Enter to **Start** (ARMED → FIRING). The simulation runs (about 30–60 seconds by default).
+   - When it finishes, you are back to **OFF**. You can Arm and Start again, or type **Q** to Quit.
+
+3. Optional: type **L** then **S** to enable **live plot** for the next run (temperature, power, depth update as the run progresses).
+
+4. If the system goes to **FAULT** (e.g. over-temperature), the run stops. Type **C** to **Clear fault** (FAULT → OFF), then you can Arm and Start again.
+
+5. Type **Q** and Enter to **Quit** the menu.
 
 **State machine (OFF, ARMED, FIRING, FAULT):**
 
@@ -124,12 +139,9 @@ Valid transitions: OFF ↔ ARMED, ARMED → FIRING, FIRING → OFF (stop) or FIR
 
 CSV logs are written to `outputs/logs/run_YYYYMMDD_HHMMSS.csv` (time, temperatures, power, depth, state).
 
-- The simulation runs for about 30–60 seconds.
-- When it finishes, **three plot windows** will open (Temperature, Power, Depth).
-- The same three plots are also saved as images in the **`outputs`** folder:
-  - `temperature.png`
-  - `power.png`
-  - `depth.png`
+---
+
+**Batch run (no menu):** To run a single 30-minute simulation and save plots without the state-machine menu, use `python scripts/run_simulation.py` (see top of "Run the simulation"). That run takes about 30–60 seconds; when it finishes, three plot windows open and the same plots are saved in **`outputs`** as `temperature.png`, `power.png`, and `depth.png`.
 
 You can close the plot windows when you’re done; the files in `outputs` stay.
 
