@@ -92,6 +92,25 @@ python scripts/run_simulation.py
 
 On Windows, if `python` doesn’t work, try: `py -3 scripts/run_simulation.py`.
 
+### Menu-driven controller (interactive)
+
+For a **state-machine–driven interface** with OFF → ARMED → FIRING → FAULT, axis enable/disable, **live plotting**, and **CSV data logging**:
+
+```bash
+python scripts/run_interactive.py
+```
+
+- **A** = Arm (OFF → ARMED)  
+- **S** = Start (run simulation; optionally enable **L** first for live plot)  
+- **P** = Stop (request stop during run)  
+- **C** = Clear fault (FAULT → OFF)  
+- **E** then **X**/**Y**/**Z** = Toggle that axis on/off  
+- **D** = Display pulse and axis power config  
+- **L** = Toggle live plot for the next run  
+- **Q** = Quit  
+
+CSV logs are written to `outputs/logs/run_YYYYMMDD_HHMMSS.csv` (time, temperatures, power, depth, state).
+
 - The simulation runs for about 30–60 seconds.
 - When it finishes, **three plot windows** will open (Temperature, Power, Depth).
 - The same three plots are also saved as images in the **`outputs`** folder:

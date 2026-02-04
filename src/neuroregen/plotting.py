@@ -1,13 +1,89 @@
 """
 Build and save the three standard plots (temperature, power, depth).
+Live-updating plot for interactive runs.
 """
 
 import os
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+import numpy as np
 
 from .constants import TEMP_LIMIT_F, HYST_F, Z_MAX_M
 from .coil import c_to_f
+
+
+# --- Live plot (one figure, 3 subplots: temp, power, depth; all axes on each) ---
+def live_plot_init(
+    limit_f: float | None = None,
+    resume_f: float | None = None,
+    z_max_cm: float | None = None,
+):
+    """
+    Initialize a live-updating figure and return (fig, update_fn).
+    update_fn(t, T, P, depth) appends one step and redraws.
+    T, P, depth are 1D arrays of length 3.
+    """
+    limit_f = limit_f if limit_f is not None else TEMP_LIMIT_F
+    resume_f = resume_f if resume_f is not None else (limit_f - HYST_F)
+    z_max_cm = z_max_cm if z_max_cm is not None else (Z_MAX_M * 100)
+    axis_names = ["X", "Y", "Z"]
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
+
+    plt.ion()
+    fig, axes = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
+    t_buf, T_buf, P_buf, depth_buf = [], [], [], []
+
+    # Temperature
+    for i, (name, color) in enumerate(zip(axis_names, colors)):
+        axes[0].plot([], [], label=f"{name}", color=color, linewidth=1.5)[0]
+    axes[0].axhline(limit_f, ls="--", color="red", linewidth=1.5, label="Limit")
+    axes[0].axhline(resume_f, ls=":", color="orange", linewidth=1, label="Resume")
+    axes[0].set_ylabel("Temperature (°F)")
+    axes[0].set_title("Temperature")
+    axes[0].legend(loc="upper right", fontsize=8)
+    axes[0].grid(True, alpha=0.3)
+
+    # Power
+    for i, (name, color) in enumerate(zip(axis_names, colors)):
+        axes[1].plot([], [], drawstyle="steps-post", label=f"{name}", color=color, linewidth=1.5)[0]
+    axes[1].set_ylabel("Power (W)")
+    axes[1].set_title("Power")
+    axes[1].legend(loc="upper right", fontsize=8)
+    axes[1].grid(True, alpha=0.3)
+
+    # Depth
+    for i, (name, color) in enumerate(zip(axis_names, colors)):
+        axes[2].plot([], [], label=f"{name}", color=color, linewidth=1.5)[0]
+    axes[2].axhline(z_max_cm, ls="--", color="red", linewidth=1, label="Limit")
+    axes[2].set_ylabel("Depth (cm)")
+    axes[2].set_xlabel("Time (min)")
+    axes[2].set_title("Depth")
+    axes[2].legend(loc="upper right", fontsize=8)
+    axes[2].grid(True, alpha=0.3)
+    axes[2].set_ylim(0, z_max_cm * 1.1)
+
+    lines_temp = [axes[0].get_lines()[i] for i in range(3)]
+    lines_power = [axes[1].get_lines()[i] for i in range(3)]
+    lines_depth = [axes[2].get_lines()[i] for i in range(3)]
+
+    def update(t: float, T: np.ndarray, P: np.ndarray, depth: np.ndarray) -> None:
+        t_buf.append(t)
+        T_buf.append((c_to_f(T[0]), c_to_f(T[1]), c_to_f(T[2])))
+        P_buf.append((float(P[0]), float(P[1]), float(P[2])))
+        depth_buf.append((float(depth[0]), float(depth[1]), float(depth[2])))
+        t_min = np.array(t_buf) / 60
+        for i in range(3):
+            lines_temp[i].set_data(t_min, [v[i] for v in T_buf])
+            lines_power[i].set_data(t_min, [v[i] for v in P_buf])
+            lines_depth[i].set_data(t_min, [v[i] for v in depth_buf])
+        for ax in axes:
+            ax.relim()
+            ax.autoscale_view(scalex=True, scaley=False)
+        axes[2].set_ylim(0, z_max_cm * 1.1)
+        fig.canvas.draw_idle()
+        plt.pause(0.001)
+
+    return fig, update, (t_buf, T_buf, P_buf, depth_buf)
 
 
 def plot_and_save(

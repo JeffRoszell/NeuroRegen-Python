@@ -14,8 +14,11 @@ from .constants import (
 )
 from .coil import Axis, coil_geom, resistance, B_loop, effective_depth_cm, c_to_f, f_to_c
 from .thermal import thermal_gate_update
-from .simulation import run_simulation, default_axes
-from .plotting import plot_and_save
+from .simulation import run_simulation, run_simulation_stepwise, default_axes
+from .plotting import plot_and_save, live_plot_init
+from .state_machine import ControllerState
+from .controller import Controller
+from .csv_logger import open_log
 from .config_loader import load_config
 from .field_mapping import (
     B_field_3d_loop,
@@ -30,8 +33,13 @@ from .field_mapping import (
 __all__ = [
     "load_config",
     "run_simulation",
+    "run_simulation_stepwise",
     "default_axes",
     "plot_and_save",
+    "live_plot_init",
+    "ControllerState",
+    "Controller",
+    "open_log",
     "B_field_3d_loop",
     "B_magnitude_3d",
     "create_spatial_grid",
