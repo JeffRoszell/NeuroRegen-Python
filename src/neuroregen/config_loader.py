@@ -1,6 +1,10 @@
 """
 Load simulation config from a YAML file.
-Returns a flat dict with run parameters and a list of Axis.
+
+Supports two config formats:
+    - **Single-coil** (``load_config``) — 3-axis pulsed coil setup.
+    - **Multicoil** (``load_multicoil_config``) — N-coil deep-brain
+      focusing array with 3-D positions, orientations, and safety limits.
 """
 
 import os
@@ -14,6 +18,18 @@ except ImportError:
     yaml = None
 
 
+# ---------------------------------------------------------------------------
+# Project root helper
+# ---------------------------------------------------------------------------
+def _project_root() -> Path:
+    """Return the repo root (parent of ``src/``)."""
+    pkg_dir = Path(__file__).resolve().parent  # .../src/neuroregen
+    return pkg_dir.parent.parent               # .../Python Code
+
+
+# ---------------------------------------------------------------------------
+# Single-coil config loader (unchanged API)
+# ---------------------------------------------------------------------------
 def load_config(path: str | os.PathLike | None = None) -> dict:
     """
     Load config from a YAML file. If path is None, use config/default.yaml
@@ -25,10 +41,7 @@ def load_config(path: str | os.PathLike | None = None) -> dict:
         raise ImportError("PyYAML is required for config. Install with: pip install pyyaml")
 
     if path is None:
-        # Default: config/default.yaml relative to repo root (parent of src/)
-        pkg_dir = Path(__file__).resolve().parent  # .../src/neuroregen
-        root = pkg_dir.parent.parent  # .../Python Code
-        path = root / "config" / "default.yaml"
+        path = _project_root() / "config" / "default.yaml"
 
     path = Path(path)
     if not path.exists():
@@ -67,3 +80,126 @@ def load_config(path: str | os.PathLike | None = None) -> dict:
         "b_threshold_t": float(depth.get("b_threshold_t", 1e-4)),
         "axes": axes,
     }
+
+
+# ---------------------------------------------------------------------------
+# Multicoil config loader
+# ---------------------------------------------------------------------------
+def load_multicoil_config(path: str | os.PathLike | None = None) -> dict:
+    """
+    Load a multicoil YAML config.
+
+    If *path* is ``None``, falls back to ``config/multicoil.yaml``.
+
+    Returns
+    -------
+    dict with keys:
+        target      – dict(name, position_m)
+        coils       – list of dict(name, wire_mm, loop_mm, turns,
+                       pulse_power_w, position_m, normal)
+        cortical_max_vm, scalp_to_cortex_m, skull_radius_m
+        sim_time, dt, pulse_freq, pulse_width
+        t_amb_c, h_conv, temp_limit_f, hyst_f
+        z_max_m, z_points, b_threshold_t
+    """
+    if yaml is None:
+        raise ImportError("PyYAML is required for config. Install with: pip install pyyaml")
+
+    if path is None:
+        path = _project_root() / "config" / "multicoil.yaml"
+
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Multicoil config not found: {path}")
+
+    with open(path) as f:
+        raw = yaml.safe_load(f)
+
+    # --- target ---
+    tgt = raw.get("target", {})
+    target = dict(
+        name=tgt.get("name", "unknown"),
+        position_m=tuple(float(v) for v in tgt.get("position_m", [0, 0, 0])),
+    )
+
+    # --- safety ---
+    safety = raw.get("safety", {})
+    cortical_max_vm = float(safety.get("cortical_max_vm", 150.0))
+    scalp_to_cortex_m = float(safety.get("scalp_to_cortex_m", 0.015))
+
+    # --- geometry ---
+    geom = raw.get("geometry", {})
+    skull_radius_m = float(geom.get("skull_radius_m", 0.09))
+
+    # --- coils ---
+    coils_spec = raw.get("coils", [])
+    coils = []
+    for c in coils_spec:
+        coils.append(dict(
+            name=c["name"],
+            wire_mm=float(c["wire_mm"]),
+            loop_mm=float(c["loop_mm"]),
+            turns=int(c["turns"]),
+            pulse_power_w=float(c["pulse_power_w"]),
+            position_m=tuple(float(v) for v in c["position_m"]),
+            normal=tuple(float(v) for v in c["normal"]),
+        ))
+
+    # --- simulation ---
+    sim = raw.get("simulation", {})
+    therm = raw.get("thermal", {})
+    depth = raw.get("depth", {})
+
+    return {
+        "target": target,
+        "coils": coils,
+        "cortical_max_vm": cortical_max_vm,
+        "scalp_to_cortex_m": scalp_to_cortex_m,
+        "skull_radius_m": skull_radius_m,
+        "sim_time": float(sim.get("sim_time", 1800.0)),
+        "dt": float(sim.get("dt", 0.1)),
+        "pulse_freq": float(sim.get("pulse_freq", 5.0)),
+        "pulse_width": float(sim.get("pulse_width", 0.02)),
+        "t_amb_c": float(therm.get("t_amb_c", 22.0)),
+        "h_conv": float(therm.get("h_conv", 10.0)),
+        "temp_limit_f": float(therm.get("temp_limit_f", 75.0)),
+        "hyst_f": float(therm.get("hyst_f", 0.7)),
+        "z_max_m": float(depth.get("z_max_m", 0.12)),
+        "z_points": int(depth.get("z_points", 500)),
+        "b_threshold_t": float(depth.get("b_threshold_t", 1e-4)),
+    }
+
+
+def build_multicoil_objects(config: dict):
+    """
+    Convenience: turn the flat dict from :func:`load_multicoil_config` into
+    ready-to-use ``(MulticoilArray, flat_config)`` for the simulation.
+
+    The returned *flat_config* is the same dict, suitable for passing to
+    :func:`run_multicoil_simulation`.
+    """
+    from .multicoil import Coil, Target, MulticoilArray
+
+    target = Target(
+        name=config["target"]["name"],
+        position_m=config["target"]["position_m"],
+    )
+    coils = [
+        Coil(
+            name=c["name"],
+            wire_mm=c["wire_mm"],
+            loop_mm=c["loop_mm"],
+            turns=c["turns"],
+            pulse_power_w=c["pulse_power_w"],
+            position_m=c["position_m"],
+            normal=c["normal"],
+        )
+        for c in config["coils"]
+    ]
+    array = MulticoilArray(
+        coils=coils,
+        target=target,
+        cortical_max_vm=config["cortical_max_vm"],
+        surface_distance_m=config["scalp_to_cortex_m"],
+    )
+    return array, config

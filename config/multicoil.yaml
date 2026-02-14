@@ -1,0 +1,86 @@
+# NeuroRegen — Multicoil deep-brain stimulation configuration
+#
+# Coordinate system (head-centred):
+#   Origin : geometric centre of the skull
+#   X      : left (−) / right (+)
+#   Y      : posterior (−) / anterior (+)
+#   Z      : inferior (−) / superior (+)
+#
+# Skull modelled as a sphere of radius ~9 cm.
+# STN (left) located approximately 12 mm lateral, 13 mm posterior,
+# 40 mm inferior to head centre.
+
+# --- Stimulation target ---------------------------------------------------
+target:
+  name: STN_left
+  # (x, y, z) in metres relative to head centre
+  position_m: [-0.012, -0.013, -0.040]
+
+# --- Safety thresholds ----------------------------------------------------
+safety:
+  cortical_max_vm: 150.0       # max E-field at cortex (V/m)
+  scalp_to_cortex_m: 0.015     # scalp + skull thickness (m)
+
+# --- Geometry reference ---------------------------------------------------
+geometry:
+  skull_radius_m: 0.09          # approximate skull radius (m)
+
+# --- Coil array -----------------------------------------------------------
+# Each coil sits on the skull surface.  The normal vector points inward
+# from the coil centre toward the target (coil physically tilted to aim).
+#
+# Distances to STN_left:
+#   Coil A (vertex)     ≈ 12.8 cm  — longest path (directly above)
+#   Coil B (lateral)    ≈ 11.7 cm  — lateral approach
+#   Coil C (posterior)  ≈  9.3 cm  — shortest path
+
+coils:
+  - name: A
+    wire_mm: 1.2
+    loop_mm: 80
+    turns: 20
+    pulse_power_w: 60
+    # Superior / vertex position
+    position_m: [-0.010, -0.010, 0.088]
+    # Normal aimed at STN (direction from coil to target, normalised)
+    normal: [-0.016, -0.023, -1.000]
+
+  - name: B
+    wire_mm: 1.2
+    loop_mm: 80
+    turns: 20
+    pulse_power_w: 60
+    # Right-lateral / temporal position
+    position_m: [0.085, -0.020, 0.025]
+    # Normal aimed at STN (direction from coil to target, normalised)
+    normal: [-0.829, 0.060, -0.556]
+
+  - name: C
+    wire_mm: 1.2
+    loop_mm: 80
+    turns: 20
+    pulse_power_w: 60
+    # Posterior / occipital position
+    position_m: [-0.015, -0.088, 0.015]
+    # Normal aimed at STN (direction from coil to target, normalised)
+    normal: [0.032, 0.806, -0.591]
+
+# --- Simulation timing ----------------------------------------------------
+simulation:
+  sim_time: 1800.0      # 30 minutes (s)
+  dt: 0.1               # time step (s)
+  pulse_freq: 5.0       # Hz
+  pulse_width: 0.02     # s ON per pulse
+
+# --- Thermal limits -------------------------------------------------------
+thermal:
+  h_conv: 10.0          # convective heat transfer (W/m²/K)
+  t_amb_c: 22.0         # ambient temperature (°C)
+  temp_limit_f: 75.0    # skip pulses above this (°F)
+  hyst_f: 0.7           # resume below (limit − hyst) (°F)
+
+# --- Depth / B-field thresholds -------------------------------------------
+depth:
+  z_max_m: 0.12         # max depth evaluated (m) — 12 cm for deep target
+  z_points: 500         # grid resolution along depth axis
+  b_threshold_t: 1.0e-4 # B-field threshold (T) for effective stimulation
