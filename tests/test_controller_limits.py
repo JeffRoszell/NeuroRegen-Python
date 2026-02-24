@@ -10,7 +10,6 @@ sys.path.insert(0, ROOT)
 
 from src.neuroregen.controller import Controller
 from src.neuroregen.state_machine import ControllerState
-from src.neuroregen.simulation import default_axes
 
 
 def test_controller_fault_on_over_temperature():

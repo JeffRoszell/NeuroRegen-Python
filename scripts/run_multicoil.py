@@ -151,13 +151,13 @@ def plot_multicoil_results(
 
     # ---- Combined B at target (peak during pulses) --------------------------
     ax = axes[1, 0]
-    B_mT = results["B_target"] * 1e4
+    B_mT = results["B_target"] * 1000
     tm, _m, _lo, hi = _rolling_stats(t_sec, B_mT, win)
     ax.plot(tm / 60, hi, color="#2ca02c", linewidth=2.0,
             label="Peak |B| during pulses")
     b_thresh = config.get("b_threshold_t", 1e-4)
-    ax.axhline(b_thresh * 1e4, ls="--", color="red", linewidth=1.5,
-               label=f"Threshold {b_thresh*1e4:.2f} mT")
+    ax.axhline(b_thresh * 1000, ls="--", color="red", linewidth=1.5,
+               label=f"Threshold {b_thresh*1000:.2f} mT")
     ax.set_ylabel("|B| at target (mT)")
     ax.set_xlabel("Time (min)")
     ax.set_title(
@@ -255,7 +255,7 @@ def plot_field_focus(
     )
 
     fig, ax = plt.subplots(figsize=(10, 9))
-    B_mT = B_mag * 1e4
+    B_mT = B_mag * 1000
 
     vmax = B_mT.max()
     vmin = max(B_mT[B_mT > 0].min(), vmax * 1e-3) if np.any(B_mT > 0) else 1e-6
@@ -268,7 +268,7 @@ def plot_field_focus(
     plt.colorbar(cs, ax=ax, label="|B| (mT)")
 
     # Threshold contour
-    b_thresh = config.get("b_threshold_t", 1e-4) * 1e4
+    b_thresh = config.get("b_threshold_t", 1e-4) * 1000
     above = B_mT >= b_thresh
     if np.any(above):
         ax.contour(
@@ -396,12 +396,12 @@ def plot_3d_geometry(
     ))
 
     # ---- 2. Focal field volume (coloured point cloud) ----------------------
-    B_mT = B_mag * 1e4  # convert to mT for display
-    B_at_tgt_mT = B_at_tgt * 1e4
+    B_mT = B_mag * 1000  # convert to mT for display
+    B_at_tgt_mT = B_at_tgt * 1000
 
     # Show points above 25 % of peak; subsample to keep it responsive
     floor_frac = 0.25
-    floor_mT = B_peak * 1e4 * floor_frac
+    floor_mT = B_peak * 1000 * floor_frac
     mask = (B_mT >= floor_mT) & (~outside)
 
     if np.any(mask):
@@ -502,7 +502,7 @@ def plot_3d_geometry(
     target_hover = (
         f"<b>{target.name}</b><br>"
         f"Position: ({ttx:.1f}, {tty:.1f}, {ttz:.1f}) cm<br>"
-        f"Combined |B|: {B_at_tgt*1e4:.2f} mT"
+        f"Combined |B|: {B_at_tgt*1000:.2f} mT"
     )
     traces.append(go.Scatter3d(
         x=[ttx], y=[tty], z=[ttz],
@@ -543,7 +543,7 @@ def plot_3d_geometry(
             text=(
                 f"Multicoil Array — {nc} coils → {target.name}<br>"
                 f"<sup>Skull Ø {skull_r*200:.0f} cm  |  "
-                f"Combined B at target: {B_at_tgt*1e4:.2f} mT</sup>"
+                f"Combined B at target: {B_at_tgt*1000:.2f} mT</sup>"
             ),
             font=dict(size=18),
         ),
@@ -639,7 +639,7 @@ def main():
     total_steps = len(results["t"])
     B_peak = results["B_target"].max()
     E_peak = results["E_surface"].max()
-    print(f"\n  Peak |B| at target    : {B_peak*1e4:.4f} mT")
+    print(f"\n  Peak |B| at target    : {B_peak*1000:.4f} mT")
     print(f"  Peak cortical E-field : {E_peak:.2f} V/m")
     print(f"  Depth-gate failures   : {gate_failures}/{total_steps} steps "
           f"({gate_failures/total_steps*100:.1f}%)")

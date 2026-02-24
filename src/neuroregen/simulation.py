@@ -73,9 +73,10 @@ def run_simulation(
     t = np.arange(0, sim_time, dt)
     z = np.linspace(0, z_max_m, z_points)
     n = len(t)
-    T = np.full((n, 3), t_amb_c)
-    P = np.zeros((n, 3))
-    depth = np.zeros((n, 3))
+    n_axes = len(axes)
+    T = np.full((n, n_axes), t_amb_c)
+    P = np.zeros((n, n_axes))
+    depth = np.zeros((n, n_axes))
 
     geom = [coil_geom(a) for a in axes]
     Cth = [g[4] * CP_CU for g in geom]
@@ -187,9 +188,10 @@ def run_simulation_stepwise(
     t = np.arange(0, sim_time, dt)
     z = np.linspace(0, z_max_m, z_points)
     n = len(t)
-    T = np.full((n, 3), t_amb_c)
-    P = np.zeros((n, 3))
-    depth = np.zeros((n, 3))
+    n_axes = len(axes)
+    T = np.full((n, n_axes), t_amb_c)
+    P = np.zeros((n, n_axes))
+    depth = np.zeros((n, n_axes))
 
     geom = [coil_geom(a) for a in axes]
     Cth = [g[4] * CP_CU for g in geom]

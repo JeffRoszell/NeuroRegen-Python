@@ -148,7 +148,7 @@ def main():
                 # Calculate field map
                 B_mag = calculate_field_map(axis, Pin, T_c, X, Y, Z)
 
-                print(f"  B-field range: {B_mag.min() * 1e4:.3f} - {B_mag.max() * 1e4:.3f} mT")
+                print(f"  B-field range: {B_mag.min() * 1000:.3f} - {B_mag.max() * 1000:.3f} mT")
 
                 # Calculate global B-field bounds for fixed color scale
                 B_min = B_mag[B_mag > 0].min() + 1e-6
@@ -173,6 +173,7 @@ def main():
                         show=False,
                         vmin=B_min,
                         vmax=B_max,
+                        z_coords=z_coords,
                     )
 
                 # Interactive depth-slice plot

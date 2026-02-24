@@ -217,6 +217,7 @@ def plot_field_contours_2d(
     show: bool = True,
     vmin: Optional[float] = None,
     vmax: Optional[float] = None,
+    z_coords: Optional[np.ndarray] = None,
 ):
     """
     Create 2D contour plot of B-field magnitude at a fixed z-slice.
@@ -246,7 +247,8 @@ def plot_field_contours_2d(
         Use fixed values across slices to compare degradation.
     """
     # Find closest z-index
-    z_coords = np.linspace(0, 0.03, B_mag.shape[2])
+    if z_coords is None:
+        z_coords = np.linspace(0, 0.03, B_mag.shape[2])
     z_idx = np.argmin(np.abs(z_coords - z_slice))
     B_slice = B_mag[:, :, z_idx]
 

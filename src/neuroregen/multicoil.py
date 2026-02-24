@@ -8,9 +8,10 @@ within safe limits.
 
 Key features
 ------------
-1. **Inverse-square / cubic distance compensation** – each coil's drive
-   amplitude is automatically scaled so that every coil delivers equal
-   field strength at the focal point, regardless of its distance.
+1. **Sixth-power distance compensation** – each coil's drive amplitude is
+   automatically scaled so that every coil delivers equal field strength at
+   the focal point, regardless of its distance.  Because B ∝ √P / d³ in
+   the far field, equalising B requires power weights ∝ d⁶.
 2. **Depth Gate (surface-to-target ratio)** – the induced E-field at the
    cortical surface directly under each coil is estimated.  If any coil
    exceeds the safety threshold (default 150 V/m) the entire pulse is
@@ -28,7 +29,7 @@ from __future__ import annotations
 
 import numpy as np
 from dataclasses import dataclass
-from typing import Callable, Generator, Optional
+from typing import Callable, Generator
 
 from .constants import MU0, CP_CU, B_THRESHOLD_T
 from .coil import Axis, coil_geom, resistance, f_to_c
@@ -139,33 +140,6 @@ def euclidean_distance(
     return float(np.sqrt(sum((a - b) ** 2 for a, b in zip(p1, p2))))
 
 
-def rotation_matrix_from_normal(normal: tuple | np.ndarray) -> np.ndarray:
-    """
-    3 × 3 rotation matrix that maps the local *z*-axis onto *normal*.
-
-    Uses Rodrigues' rotation formula.  Returns identity when *normal*
-    is already ``(0, 0, 1)`` and a flip for ``(0, 0, -1)``.
-    """
-    n = np.asarray(normal, dtype=float)
-    n = n / np.linalg.norm(n)
-
-    z = np.array([0.0, 0.0, 1.0])
-    dot = float(np.dot(z, n))
-
-    if abs(dot - 1.0) < 1e-10:
-        return np.eye(3)
-    if abs(dot + 1.0) < 1e-10:
-        return np.diag([1.0, -1.0, -1.0])
-
-    v = np.cross(z, n)
-    s = float(np.linalg.norm(v))
-    vx = np.array([
-        [0.0,   -v[2],  v[1]],
-        [v[2],   0.0,  -v[0]],
-        [-v[1],  v[0],  0.0],
-    ])
-    return np.eye(3) + vx + vx @ vx * ((1.0 - dot) / (s ** 2))
-
 
 # ---------------------------------------------------------------------------
 # Single-coil B-field in 3-D (with orientation)
@@ -266,10 +240,12 @@ def compute_distance_weights(
     Physics
     -------
     ``B ∝ R² / (R² + z²)^{3/2} ≈ 1/z³`` for ``z >> R``.
-    Weight ∝ ``r³`` (distance compensation) ÷ ``cos θ`` (tilt correction).
+    Since ``B ∝ √P / d³`` (current from power as ``I = √(P/R)``), equalising
+    B at the target requires ``P ∝ d^6``.
+    Weight ∝ ``d^6`` (distance compensation) ÷ ``cos θ`` (tilt correction).
     """
     distances = compute_coil_distances(coils, target)
-    weights = distances ** 3
+    weights = distances ** 6
 
     if include_cosine:
         cos_f = np.clip(compute_cosine_factors(coils, target), 0.1, 1.0)
@@ -308,13 +284,13 @@ def E_field_at_surface(
     r"""
     Peak induced E-field (V/m) at the cortical surface under a coil.
 
-    Approximation (half-sine pulse):
+    Approximation (half-sine pulse, from Faraday's law for a circular path):
 
     .. math::
 
-        E \approx R_{\text{coil}} \; \frac{\mathrm{d}B}{\mathrm{d}t}
+        E \approx \frac{R_{\text{coil}}}{2} \; \frac{\mathrm{d}B}{\mathrm{d}t}
         \qquad
-        \frac{\mathrm{d}B}{\mathrm{d}t} \approx \frac{2\,B_{\text{peak}}}
+        \frac{\mathrm{d}B}{\mathrm{d}t} \approx \frac{\pi\,B_{\text{peak}}}
         {\tau_{\text{pulse}}}
 
     Parameters
@@ -329,8 +305,8 @@ def E_field_at_surface(
     z = surface_distance_m
 
     B_surface = MU0 * I * R_loop ** 2 / (2.0 * (R_loop ** 2 + z ** 2) ** 1.5) * N
-    dBdt = B_surface * 2.0 / pulse_width
-    return float(R_loop * dBdt)
+    dBdt = B_surface * np.pi / pulse_width   # peak dB/dt for a half-sine pulse
+    return float((R_loop / 2.0) * dBdt)     # Faraday: E = (r/2) × dB/dt
 
 
 def check_depth_gate(
@@ -633,9 +609,9 @@ class MulticoilArray:
 
         B_vec, B_mag = self.B_at_target(temperatures_c)
         lines.append(
-            f"Combined B at target : {B_mag*1e4:.4f} mT  "
-            f"({B_vec[0]*1e4:+.4f}, {B_vec[1]*1e4:+.4f}, "
-            f"{B_vec[2]*1e4:+.4f}) mT"
+            f"Combined B at target : {B_mag*1000:.4f} mT  "
+            f"({B_vec[0]*1000:+.4f}, {B_vec[1]*1000:+.4f}, "
+            f"{B_vec[2]*1000:+.4f}) mT"
         )
 
         sdr = self.get_surface_to_deep_ratio(temperatures_c, pulse_width)
