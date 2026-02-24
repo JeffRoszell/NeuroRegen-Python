@@ -54,6 +54,48 @@ def _colours(n: int) -> list[str]:
     return [palette[i % len(palette)] for i in range(n)]
 
 
+_LINE_STYLES: list[str] = ["-", "--", "-.", ":"]
+_MARKERS: list[str] = ["o", "s", "D", "^", "v", "P", "*", "X"]
+
+
+def _per_coil_style(i: int) -> dict:
+    """Return distinct line style kwargs for coil *i*."""
+    return dict(
+        linestyle=_LINE_STYLES[i % len(_LINE_STYLES)],
+        linewidth=2.0,
+        marker=_MARKERS[i % len(_MARKERS)],
+        markevery=max(1, 1800 // 60),
+        markersize=5,
+    )
+
+
+def _rolling_stats(
+    t_sec: np.ndarray,
+    values: np.ndarray,
+    window_sec: float = 60.0,
+):
+    """
+    Compute rolling mean, min, and max over fixed-width time windows.
+
+    Returns (t_mid, mean, lo, hi) arrays — one point per window.
+    """
+    t_mid, means, lo, hi = [], [], [], []
+    start = 0
+    while start < len(t_sec):
+        end = start
+        t0 = t_sec[start]
+        while end < len(t_sec) and t_sec[end] < t0 + window_sec:
+            end += 1
+        chunk = values[start:end]
+        if len(chunk):
+            t_mid.append((t0 + t_sec[min(end, len(t_sec)) - 1]) / 2)
+            means.append(float(np.mean(chunk)))
+            lo.append(float(np.min(chunk)))
+            hi.append(float(np.max(chunk)))
+        start = end
+    return np.array(t_mid), np.array(means), np.array(lo), np.array(hi)
+
+
 def plot_multicoil_results(
     results: dict,
     array,
@@ -61,43 +103,58 @@ def plot_multicoil_results(
     output_dir: str,
     show: bool = True,
 ):
-    """Create and save 4-panel multicoil result plots."""
+    """Create and save 4-panel multicoil result plots.
+
+    Uses 1-minute rolling windows with mean ± min/max bands to give a
+    clear picture of long-running simulation trends instead of raw
+    pulse-by-pulse noise.
+    """
     import matplotlib.pyplot as plt
 
-    t_min = results["t"] / 60
+    t_sec = results["t"]
     nc = results["T"].shape[1]
     names = [c.name for c in array.coils]
     colors = _colours(nc)
     limit_f = config["temp_limit_f"]
     resume_f = limit_f - config["hyst_f"]
+    win = 60.0  # 1-minute rolling window
 
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
 
-    # ---- Temperature per coil ----
+    # ---- Temperature per coil -----------------------------------------------
     ax = axes[0, 0]
     for i in range(nc):
-        ax.plot(t_min, c_to_f(results["T"][:, i]),
-                label=f"Coil {names[i]}", color=colors[i], linewidth=1.5)
-    ax.axhline(limit_f, ls="--", color="red", linewidth=1.5, label=f"Limit {limit_f}°F")
-    ax.axhline(resume_f, ls=":", color="orange", linewidth=1, label=f"Resume {resume_f:.1f}°F")
+        temp_f = c_to_f(results["T"][:, i])
+        tm, mean, _lo, _hi = _rolling_stats(t_sec, temp_f, win)
+        sty = _per_coil_style(i)
+        ax.plot(tm / 60, mean, label=f"Coil {names[i]}", color=colors[i], **sty)
+    ax.axhline(limit_f, ls="--", color="red", linewidth=1.5,
+               label=f"Limit {limit_f}°F")
+    ax.axhline(resume_f, ls=":", color="orange", linewidth=1,
+               label=f"Resume {resume_f:.1f}°F")
     ax.set_ylabel("Temperature (°F)")
-    ax.set_title("Per-Coil Temperature", fontweight="bold")
-    ax.legend(fontsize=8)
+    ax.set_title("Per-Coil Temperature (1-min average)", fontweight="bold")
+    ax.legend(fontsize=9, framealpha=0.9)
     ax.grid(True, alpha=0.3)
 
-    # ---- Weighted power per coil ----
+    # ---- Weighted power per coil (peak during pulses) -------------------------
     ax = axes[0, 1]
     for i in range(nc):
-        ax.step(t_min, results["P"][:, i],
-                where="post", label=f"Coil {names[i]}", color=colors[i], linewidth=1.5)
-    ax.set_ylabel("Weighted Power (W)")
-    ax.set_title("Per-Coil Weighted Power (distance-compensated)", fontweight="bold")
-    ax.legend(fontsize=8)
+        tm, _m, _lo, hi = _rolling_stats(t_sec, results["P"][:, i], win)
+        sty = _per_coil_style(i)
+        ax.plot(tm / 60, hi, label=f"Coil {names[i]}", color=colors[i], **sty)
+    ax.set_ylabel("Pulse Power (W)")
+    ax.set_title("Per-Coil Weighted Power During Pulses",
+                 fontweight="bold")
+    ax.legend(fontsize=9, framealpha=0.9)
     ax.grid(True, alpha=0.3)
 
-    # ---- Combined B at target ----
+    # ---- Combined B at target (peak during pulses) --------------------------
     ax = axes[1, 0]
-    ax.plot(t_min, results["B_target"] * 1e4, color="#2ca02c", linewidth=1.5)
+    B_mT = results["B_target"] * 1e4
+    tm, _m, _lo, hi = _rolling_stats(t_sec, B_mT, win)
+    ax.plot(tm / 60, hi, color="#2ca02c", linewidth=2.0,
+            label="Peak |B| during pulses")
     b_thresh = config.get("b_threshold_t", 1e-4)
     ax.axhline(b_thresh * 1e4, ls="--", color="red", linewidth=1.5,
                label=f"Threshold {b_thresh*1e4:.2f} mT")
@@ -106,26 +163,46 @@ def plot_multicoil_results(
     ax.set_title(
         f"Superposed B-Field at {array.target.name}", fontweight="bold",
     )
-    ax.legend(fontsize=8)
+    ax.legend(fontsize=9, framealpha=0.9)
     ax.grid(True, alpha=0.3)
 
-    # ---- Cortical E per coil ----
+    # ---- Cortical E per coil (peak per window, auto-scaled) -----------------
     ax = axes[1, 1]
+    e_max_global = 0.0
     for i in range(nc):
-        ax.plot(t_min, results["E_surface"][:, i],
-                label=f"Coil {names[i]}", color=colors[i], linewidth=1.5)
-    ax.axhline(config["cortical_max_vm"], ls="--", color="red", linewidth=2,
-               label=f"Safety limit {config['cortical_max_vm']:.0f} V/m")
-    ax.set_ylabel("Cortical E-field (V/m)")
+        tm, mean, lo, hi = _rolling_stats(t_sec, results["E_surface"][:, i], win)
+        sty = _per_coil_style(i)
+        ax.plot(tm / 60, hi, label=f"Coil {names[i]} (peak)",
+                color=colors[i], **sty)
+        if len(hi) > 0:
+            e_max_global = max(e_max_global, float(np.max(hi)))
+
+    safety_limit = config["cortical_max_vm"]
+    if e_max_global > 0:
+        y_top = e_max_global * 1.6
+        ax.set_ylim(bottom=0, top=y_top)
+        ax.annotate(
+            f"Safety limit: {safety_limit:.0f} V/m (well above range)",
+            xy=(0.98, 0.97), xycoords="axes fraction",
+            ha="right", va="top", fontsize=9, color="red",
+            bbox=dict(boxstyle="round,pad=0.3", fc="lightyellow",
+                      ec="red", alpha=0.85),
+        )
+    else:
+        ax.axhline(safety_limit, ls="--", color="red", linewidth=2,
+                   label=f"Safety limit {safety_limit:.0f} V/m")
+
+    ax.set_ylabel("Peak Cortical E-field (V/m)")
     ax.set_xlabel("Time (min)")
     ax.set_title("Cortical Surface E-Field (Depth Gate)", fontweight="bold")
-    ax.legend(fontsize=8)
+    ax.legend(fontsize=9, framealpha=0.9)
     ax.grid(True, alpha=0.3)
 
     # Mark depth-gate failures (if any)
     gate_fail = ~results["depth_gate"]
     if np.any(gate_fail):
-        fail_t = t_min[gate_fail]
+        t_min_arr = t_sec / 60
+        fail_t = t_min_arr[gate_fail]
         for a in axes.flat:
             for ft in fail_t[::max(1, len(fail_t) // 20)]:
                 a.axvline(ft, color="red", alpha=0.15, linewidth=0.5)
