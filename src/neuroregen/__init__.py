@@ -19,7 +19,7 @@ from .plotting import plot_and_save, live_plot_init
 from .state_machine import ControllerState
 from .controller import Controller
 from .csv_logger import open_log
-from .config_loader import load_config, load_multicoil_config, build_multicoil_objects
+from .config_loader import load_config, load_multicoil_config, build_multicoil_objects, load_pulsed_config
 from .field_mapping import (
     B_field_3d_loop,
     B_magnitude_3d,
@@ -28,6 +28,17 @@ from .field_mapping import (
     plot_field_contours_2d,
     plot_field_interactive_slice,
     plot_targeting_volume,
+)
+from .pulsed import (
+    coil_inductance,
+    discharge_params,
+    max_rep_rate,
+    B_peak_on_axis,
+    E_induced_peak,
+    heat_per_pulse,
+    superposed_B_peak_at,
+    run_pulsed_thermal_sim,
+    PulsedSimResult,
 )
 from .multicoil import (
     Coil,
@@ -51,6 +62,17 @@ from .multicoil import (
 )
 
 __all__ = [
+    # --- pulsed TMS ---
+    "load_pulsed_config",
+    "coil_inductance",
+    "discharge_params",
+    "max_rep_rate",
+    "B_peak_on_axis",
+    "E_induced_peak",
+    "heat_per_pulse",
+    "superposed_B_peak_at",
+    "run_pulsed_thermal_sim",
+    "PulsedSimResult",
     # --- single-coil ---
     "load_config",
     "run_simulation",

@@ -170,6 +170,85 @@ def load_multicoil_config(path: str | os.PathLike | None = None) -> dict:
     }
 
 
+def load_pulsed_config(path: str | os.PathLike | None = None) -> dict:
+    """
+    Load a pulsed-TMS capacitor-discharge config (e.g. ``config/pulsed_tms.yaml``).
+
+    Extends the multicoil format with a ``capacitor`` section and pulsed
+    simulation parameters.
+
+    If *path* is ``None``, falls back to ``config/pulsed_tms.yaml``.
+
+    Returns
+    -------
+    dict with all keys from :func:`load_multicoil_config` plus:
+        capacitance_f        – capacitance per coil (F)
+        charge_voltage_v     – charge voltage (V)
+        n_pulses             – number of pulse events to simulate
+        dt_between_pulses    – cooling time step between pulses (s)
+        r_tissue_m           – effective tissue loop radius for E-field (m)
+    """
+    if yaml is None:
+        raise ImportError("PyYAML is required for config. Install with: pip install pyyaml")
+
+    if path is None:
+        path = _project_root() / "config" / "pulsed_tms.yaml"
+
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Pulsed TMS config not found: {path}")
+
+    with open(path) as f:
+        raw = yaml.safe_load(f)
+
+    # Reuse multicoil base sections
+    tgt = raw.get("target", {})
+    target = dict(
+        name=tgt.get("name", "unknown"),
+        position_m=tuple(float(v) for v in tgt.get("position_m", [0, 0, 0])),
+    )
+
+    safety = raw.get("safety", {})
+    geom = raw.get("geometry", {})
+    coils_spec = raw.get("coils", [])
+    coils = []
+    for c in coils_spec:
+        coils.append(dict(
+            name=c["name"],
+            wire_mm=float(c["wire_mm"]),
+            loop_mm=float(c["loop_mm"]),
+            turns=int(c["turns"]),
+            pulse_power_w=float(c.get("pulse_power_w", 0.0)),
+            position_m=tuple(float(v) for v in c["position_m"]),
+            normal=tuple(float(v) for v in c["normal"]),
+        ))
+
+    cap = raw.get("capacitor", {})
+    sim = raw.get("simulation", {})
+    therm = raw.get("thermal", {})
+
+    return {
+        "target": target,
+        "coils": coils,
+        "cortical_max_vm": float(safety.get("cortical_max_vm", 150.0)),
+        "scalp_to_cortex_m": float(safety.get("scalp_to_cortex_m", 0.015)),
+        "skull_radius_m": float(geom.get("skull_radius_m", 0.09)),
+        # capacitor
+        "capacitance_f": float(cap.get("capacitance_f", 200e-6)),
+        "charge_voltage_v": float(cap.get("charge_voltage_v", 2500.0)),
+        # pulsed simulation
+        "n_pulses": int(sim.get("n_pulses", 60)),
+        "pulse_freq": float(sim.get("pulse_freq", 1.0)),
+        "dt_between_pulses": float(sim.get("dt_between_pulses", 0.001)),
+        # thermal
+        "t_amb_c": float(therm.get("t_amb_c", 22.0)),
+        "h_conv": float(therm.get("h_conv", 10.0)),
+        "temp_limit_f": float(therm.get("temp_limit_f", 75.0)),
+        "hyst_f": float(therm.get("hyst_f", 0.7)),
+        "r_tissue_m": float(therm.get("r_tissue_m", 0.005)),
+    }
+
+
 def build_multicoil_objects(config: dict):
     """
     Convenience: turn the flat dict from :func:`load_multicoil_config` into

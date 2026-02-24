@@ -1,0 +1,71 @@
+# NeuroRegen — Pulsed TMS capacitor-discharge configuration
+#
+# Same coil positions as multicoil.yaml but with a larger coil geometry
+# (6 turns, 150 mm loop, 10 mm wire) suited to capacitor-discharge currents.
+#
+# Physics baseline:
+#   L  ≈  9.5 µH  (Neumann formula, single loop ≈ 0.26 µH, ×N² = ×36)
+#   I_peak ≈ 11 500 A    (V √(C/L))
+#   τ  ≈  137 µs         (π √(LC))
+#   E_pulse ≈ 625 J      (½ C V²  per coil)
+#   f_max ≈ 0.99 Hz      (3 coils × 625 J / (2 200 W × 0.85))
+#
+# SAFETY NOTE: cortical E-field >> 150 V/m at these currents.
+# The depth gate will suppress pulses unless cortical_max_vm is raised.
+
+# --- Stimulation target ---------------------------------------------------
+target:
+  name: STN_left
+  position_m: [-0.012, -0.013, -0.040]
+
+# --- Safety thresholds ----------------------------------------------------
+safety:
+  cortical_max_vm: 150.0       # max allowed E-field at cortex (V/m)
+  scalp_to_cortex_m: 0.015     # scalp + skull thickness (m)
+
+# --- Capacitor bank -------------------------------------------------------
+capacitor:
+  capacitance_f: 200.0e-6      # 200 µF (per coil, independently switched)
+  charge_voltage_v: 2500.0     # 2.5 kV charge voltage
+
+# --- Coil array -----------------------------------------------------------
+# Larger coils than multicoil.yaml — 150 mm / 6-turn / 10 mm wire.
+# Same skull-surface positions and target normals.
+coils:
+  - name: A
+    wire_mm: 10.0
+    loop_mm: 150.0
+    turns: 6
+    pulse_power_w: 0            # unused in pulsed mode (current is set by C, V, L)
+    position_m: [-0.010, -0.010, 0.088]
+    normal: [-0.016, -0.023, -1.000]
+
+  - name: B
+    wire_mm: 10.0
+    loop_mm: 150.0
+    turns: 6
+    pulse_power_w: 0
+    position_m: [0.085, -0.020, 0.025]
+    normal: [-0.829, 0.060, -0.556]
+
+  - name: C
+    wire_mm: 10.0
+    loop_mm: 150.0
+    turns: 6
+    pulse_power_w: 0
+    position_m: [-0.015, -0.088, 0.015]
+    normal: [0.032, 0.806, -0.591]
+
+# --- Simulation -----------------------------------------------------------
+simulation:
+  n_pulses: 60                 # number of pulse events to simulate
+  pulse_freq: 1.0              # repetition rate (Hz)
+  dt_between_pulses: 0.001     # cooling integration step between pulses (s)
+
+# --- Thermal limits -------------------------------------------------------
+thermal:
+  h_conv: 10.0                 # convective coefficient (W/m²/K)
+  t_amb_c: 22.0                # ambient temperature (°C)
+  temp_limit_f: 75.0           # coil temperature limit (°F)
+  hyst_f: 0.7
+  r_tissue_m: 0.005            # effective tissue loop radius for E-field (m)
