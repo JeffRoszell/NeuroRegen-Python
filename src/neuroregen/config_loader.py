@@ -76,8 +76,8 @@ def load_config(path: str | os.PathLike | None = None) -> dict:
         "pulse_width": float(sim.get("pulse_width", 0.02)),
         "t_amb_c": float(therm.get("t_amb_c", 22.0)),
         "h_conv": float(therm.get("h_conv", 10.0)),
-        "temp_limit_f": float(therm.get("temp_limit_f", 75.0)),
-        "hyst_f": float(therm.get("hyst_f", 0.7)),
+        "temp_limit_f": float(therm.get("temp_limit_f", 105.0)),
+        "hyst_f": float(therm.get("hyst_f", 1.5)),
         "z_max_m": float(depth.get("z_max_m", 0.03)),
         "z_points": int(depth.get("z_points", 300)),
         "b_threshold_t": float(depth.get("b_threshold_t", 1e-4)),
@@ -212,8 +212,8 @@ def load_multicoil_config(path: str | os.PathLike | None = None) -> dict:
         "pulse_width": float(sim.get("pulse_width", 0.02)),
         "t_amb_c": float(therm.get("t_amb_c", 22.0)),
         "h_conv": float(therm.get("h_conv", 10.0)),
-        "temp_limit_f": float(therm.get("temp_limit_f", 75.0)),
-        "hyst_f": float(therm.get("hyst_f", 0.7)),
+        "temp_limit_f": float(therm.get("temp_limit_f", 105.0)),
+        "hyst_f": float(therm.get("hyst_f", 1.5)),
         "z_max_m": float(depth.get("z_max_m", 0.12)),
         "z_points": int(depth.get("z_points", 500)),
         "b_threshold_t": float(depth.get("b_threshold_t", 1e-4)),
@@ -284,8 +284,8 @@ def load_pulsed_config(path: str | os.PathLike | None = None) -> dict:
         # thermal
         "t_amb_c": float(therm.get("t_amb_c", 22.0)),
         "h_conv": float(therm.get("h_conv", 10.0)),
-        "temp_limit_f": float(therm.get("temp_limit_f", 75.0)),
-        "hyst_f": float(therm.get("hyst_f", 0.7)),
+        "temp_limit_f": float(therm.get("temp_limit_f", 105.0)),
+        "hyst_f": float(therm.get("hyst_f", 1.5)),
         "r_tissue_m": float(therm.get("r_tissue_m", 0.005)),
     }
 

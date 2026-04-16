@@ -14,14 +14,14 @@ from src.neuroregen.coil import f_to_c
 
 def test_gate_off_at_limit():
     # At or above limit → gated off
-    assert thermal_gate_update(f_to_c(75.0), False) is True
-    assert thermal_gate_update(f_to_c(76.0), False) is True
+    assert thermal_gate_update(f_to_c(105.0), False) is True
+    assert thermal_gate_update(f_to_c(106.0), False) is True
 
 
 def test_resume_below_hyst():
     # Below hysteresis → resume (gated_off = False)
-    assert thermal_gate_update(f_to_c(74.0), True) is False
-    assert thermal_gate_update(f_to_c(73.0), True) is False
+    assert thermal_gate_update(f_to_c(103.0), True) is False
+    assert thermal_gate_update(f_to_c(102.0), True) is False
 
 
 def test_hysteresis_band():
@@ -42,7 +42,7 @@ def test_heat_limit_gating_prevents_rise():
     from src.neuroregen.constants import CP_CU
     from src.neuroregen.simulation import default_axes
 
-    limit_c = f_to_c(75.0)
+    limit_c = f_to_c(105.0)
     # At limit, gated_off=True → no Pin → only cooling. So next T should be <= T_prev (cooling).
     axes = default_axes()
     R, L, A, S, m = coil_geom(axes[0])

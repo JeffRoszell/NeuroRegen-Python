@@ -1,41 +1,44 @@
 # NeuroRegen simulation config — edit these to change runs without touching code.
 
 simulation:
-  sim_time: 1800.0    # 30 minutes (s)
-  dt: 0.1             # time step (s)
-  pulse_freq: 5.0     # Hz
-  pulse_width: 0.02   # s ON per pulse
+  sim_time: 1800.0      # 30 minutes (s)
+  dt: 0.1               # time step (s)
+  pulse_freq: 5.0       # Hz — standard rTMS facilitatory protocol
+  pulse_width: 0.000326 # 326 µs — bi-phasic pulse half-width (Navarro de Lara et al. 2021, Fig 2B)
 
 thermal:
-  h_conv: 10.0        # convective heat transfer (W/m²/K)
-  t_amb_c: 22.0       # ambient temperature (°C)
-  temp_limit_f: 75.0  # skip pulses above this (°F)
-  hyst_f: 0.7         # resume below (temp_limit_f - hyst_f) (°F)
+  h_conv: 10.0          # convective heat transfer (W/m²/K)
+  t_amb_c: 22.0         # ambient temperature (°C)
+  temp_limit_f: 105.0   # skip pulses above this (°F) — IEC 60601-1 skin contact limit (~40.6 °C)
+  hyst_f: 1.5           # resume below (temp_limit_f - hyst_f) (°F)
 
 depth:
-  z_max_m: 0.03       # max depth evaluated (m), 3 cm
-  z_points: 300       # points along z for B-field
-  b_threshold_t: 1e-4 # B-field threshold (T) for effective depth
+  z_max_m: 0.03         # max depth evaluated (m), 3 cm
+  z_points: 300         # points along z for B-field
+  b_threshold_t: 1e-4   # B-field threshold (T) for effective depth
 
+# Coil geometry from Navarro de Lara et al. 2021 (NeuroImage 224, 117355)
+# 3-axis compact TMS coil — x/y wound interlaced on spherical form, z circular solenoid
+# Wire: 2 mm Litz (New England Wires). Dimensions from Fig 1A, turns from Section 2.1.
 axes:
   - name: X
-    wire_mm: 0.60
-    loop_mm: 20.0
-    turns: 20
-    helix_height_mm: 9.5
+    wire_mm: 2.0          # 2 mm Litz wire
+    loop_mm: 42.85        # mean of inner 36.00 mm / outer 49.70 mm (Fig 1A)
+    turns: 18             # 10 outer + 8 inner layers
+    helix_height_mm: 8.0  # single winding layer height (Fig 1A)
     segments_per_turn: 96
     pulse_power_w: 1000
   - name: Y
-    wire_mm: 0.60
-    loop_mm: 26.0
-    turns: 20
-    helix_height_mm: 9.5
+    wire_mm: 2.0          # 2 mm Litz wire
+    loop_mm: 42.85        # same spherical form as x-element
+    turns: 22             # 12 outer + 10 inner layers (more turns to match inductance)
+    helix_height_mm: 8.0
     segments_per_turn: 96
     pulse_power_w: 1000
   - name: Z
-    wire_mm: 0.60
-    loop_mm: 32.0
-    turns: 20
-    helix_height_mm: 9.5
+    wire_mm: 2.0          # 2 mm Litz wire
+    loop_mm: 38.0         # mean of inner 26 mm / outer 50 mm (Fig 1A)
+    turns: 18             # 6 + 5 + 4 + 3 tapered winding layers
+    helix_height_mm: 19.6 # full axial height of z-element (Fig 1A)
     segments_per_turn: 96
     pulse_power_w: 1000

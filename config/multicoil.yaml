@@ -36,12 +36,19 @@ geometry:
 
 coils:
   # Geometry matches the ANSYS AEDT build: 6-turn / 150 mm / 10 mm wire
-  # pulse_power_w is the base power for distance-compensation weighting only
+  #
+  # pulse_power_w is the BASE power — each coil is weighted independently so
+  # its WEIGHTED power (base × d⁶ weight) lands just under the 150 V/m
+  # cortical E-field limit.  Equal weighted power → equal B at target.
+  #
+  # Weights (d⁶, coil-C reference):  A=6.79, B=3.95, C=1.00
+  # Max weighted power at 150 V/m  ≈ 8 260 W (derived from pre-flight check)
+  # Base = 8260 / weight  →  A≈1216 W, B≈2091 W, C≈8260 W
   - name: A
     wire_mm: 10.0
     loop_mm: 150.0
     turns: 6
-    pulse_power_w: 1000
+    pulse_power_w: 1200   # × 6.79 weight = 8 148 W → ~149 V/m cortical limit
     # Superior / vertex position
     position_m: [-0.010, -0.010, 0.088]
     normal: [-0.016, -0.023, -1.000]
@@ -50,7 +57,7 @@ coils:
     wire_mm: 10.0
     loop_mm: 150.0
     turns: 6
-    pulse_power_w: 1000
+    pulse_power_w: 2075   # × 3.95 weight = 8 196 W → ~149 V/m cortical limit
     # Right-lateral / temporal position
     position_m: [0.085, -0.020, 0.025]
     normal: [-0.829, 0.060, -0.556]
@@ -59,7 +66,7 @@ coils:
     wire_mm: 10.0
     loop_mm: 150.0
     turns: 6
-    pulse_power_w: 1000
+    pulse_power_w: 8100   # × 1.00 weight = 8 100 W → ~149 V/m cortical limit
     # Posterior / occipital position
     position_m: [-0.015, -0.088, 0.015]
     normal: [0.032, 0.806, -0.591]
@@ -69,7 +76,7 @@ simulation:
   sim_time: 1800.0      # 30 minutes (s)
   dt: 0.1               # time step (s)
   pulse_freq: 5.0       # Hz
-  pulse_width: 0.02     # s ON per pulse
+  pulse_width: 0.000137 # 137 µs — LC half-period of this hardware (matches pulsed sim τ)
 
 # --- Thermal limits -------------------------------------------------------
 thermal:

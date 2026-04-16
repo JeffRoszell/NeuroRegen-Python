@@ -77,6 +77,14 @@ Pass a custom config with `-c path/to/config.yaml`.
 
 ---
 
+## Configuration Reference
+
+A full breakdown of every setting across all three simulations — including the rationale for the multicoil per-coil power values and the neural activation context — is in:
+
+```
+docs/simulation-settings-breakdown.md
+```
+
 ## ANSYS Integration
 
 See `docs/ansys-integration-guide.md` for exporting B/E field CSVs from ANSYS Maxwell and activating them in `multicoil.yaml`.

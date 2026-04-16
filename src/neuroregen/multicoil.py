@@ -801,6 +801,7 @@ def run_multicoil_simulation(
             depth_gate[k] = True
 
         # --- apply power & update temperature ---
+        pulse_fraction = min(p["pulse_width"], p["dt"]) / p["dt"]
         for i in range(nc):
             R_loop, L, A, S, m = geom[i]
             Pin = float(w_powers[i])
@@ -812,7 +813,7 @@ def run_multicoil_simulation(
                 h_conv=p["h_conv"],
                 t_amb_c=p["t_amb_c"],
             )
-            T[k, i] = temp_step(T[k - 1, i], Pin, Pcool, Cth[i], p["dt"])
+            T[k, i] = temp_step(T[k - 1, i], Pin * pulse_fraction, Pcool, Cth[i], p["dt"])
 
         # --- superposed B at target ---
         if np.any(active) and depth_gate[k]:
@@ -904,6 +905,7 @@ def run_multicoil_simulation_stepwise(
                 active[:] = False
         depth_gate[k] = gate_ok
 
+        pulse_fraction = min(p["pulse_width"], p["dt"]) / p["dt"]
         for i in range(nc):
             R_loop, L, A, S, m = geom[i]
             if not coil_enabled[i]:
@@ -917,7 +919,7 @@ def run_multicoil_simulation_stepwise(
                 h_conv=p["h_conv"],
                 t_amb_c=p["t_amb_c"],
             )
-            T[k, i] = temp_step(T[k - 1, i], Pin, Pcool, Cth[i], p["dt"])
+            T[k, i] = temp_step(T[k - 1, i], Pin * pulse_fraction, Pcool, Cth[i], p["dt"])
 
         if np.any(active) and gate_ok:
             _, B_mag = superposed_B_at_target(

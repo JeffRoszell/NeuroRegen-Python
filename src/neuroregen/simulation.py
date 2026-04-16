@@ -92,9 +92,11 @@ def run_simulation(
 
             Pin = a.pulse_power_w if on else 0
             P[k, i] = Pin
+            # Scale power to actual on-time within the timestep to avoid over-depositing energy
+            Pin_thermal = Pin * min(pulse_width, dt) / dt
 
             Pcool = cooling_power(T[k - 1, i], S, h_conv=h_conv, t_amb_c=t_amb_c)
-            T[k, i] = temp_step(T[k - 1, i], Pin, Pcool, Cth[i], dt)
+            T[k, i] = temp_step(T[k - 1, i], Pin_thermal, Pcool, Cth[i], dt)
 
             if Pin > 0:
                 I = np.sqrt(Pin / resistance(L, A, T[k - 1, i]))
@@ -201,8 +203,9 @@ def run_simulation_stepwise(
             on = pulse_on and not gated_off[i]
             Pin = a.pulse_power_w if on else 0
             P[k, i] = Pin
+            Pin_thermal = Pin * min(pulse_width, dt) / dt
             Pcool = cooling_power(T[k - 1, i], S, h_conv=h_conv, t_amb_c=t_amb_c)
-            T[k, i] = temp_step(T[k - 1, i], Pin, Pcool, Cth[i], dt)
+            T[k, i] = temp_step(T[k - 1, i], Pin_thermal, Pcool, Cth[i], dt)
             if Pin > 0:
                 I = np.sqrt(Pin / resistance(L, A, T[k - 1, i]))
                 Bz = B_loop(I, R, z, a.turns)

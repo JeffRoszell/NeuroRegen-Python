@@ -69,9 +69,12 @@ All three configs now use the same physical coil geometry (matching `3AxisTeslaC
 
 ### Key Design Rules
 - All tunable parameters in YAML configs — no hardcoded sim values in source
-- Thermal gating with hysteresis: skip pulses at 75°F limit, resume at 74.3°F
+- Thermal gating with hysteresis: skip pulses at 105°F limit (IEC 60601-1 skin contact ~40.6°C), resume at 103.5°F
+- Pulse-fraction thermal fix: energy deposited = `Pin * min(pulse_width, dt) / dt` — prevents overcounting when dt >> pulse_width; peak Pin still used for B/E field calculations
+- Single-coil (default.yaml) coil geometry from Navarro de Lara et al. 2021 (NeuroImage 224, 117355): 2 mm Litz wire, x/y ~42.85 mm loop / 18–22 turns, z 38 mm loop / 18 turns, 326 µs pulse width
 - Multicoil depth gate: block entire pulse if any coil exceeds 150 V/m cortical E-field
-- Distance compensation: weights ∝ distance⁶ so all coils deliver equal field at target
+- Distance compensation: weights ∝ distance⁶ so all coils deliver equal field at target. Base powers are set **independently per coil** so each coil's weighted power (base × d⁶ weight) hits the max safe level (~8 200 W → 149 V/m). Equal base powers would cause the farthest coil to exceed the safety limit.
+- Multicoil optimal config (as of 2026-04-15): A=1200 W, B=2075 W, C=8100 W base; pulse_width=137 µs → 79.8 mT at STN, 0 depth-gate failures, peak temp < 80 °F
 - ANSYS field maps are optional; falls back to analytical Biot-Savart when absent
 - Ruff: line length 100, Python 3.9 target, ignores `E741` (allows `I` for current) and `F841`
 

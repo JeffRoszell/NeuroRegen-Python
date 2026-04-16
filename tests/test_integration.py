@@ -82,7 +82,7 @@ def test_heat_limit_never_exceeded():
     """Heat limit: temperatures must never exceed configured limit (gating enforces this)."""
     sim_time = 90.0  # long enough for heating
     dt = 0.1
-    limit_f = 75.0
+    limit_f = 105.0
     limit_c = f_to_c(limit_f)
     t, T, P, depth = run_simulation(sim_time=sim_time, dt=dt)
     # Allow at most one step overshoot (we gate after T >= limit)
@@ -118,8 +118,8 @@ def test_depth_limit_respected_with_custom_config():
         "axes": default_axes(),
         "t_amb_c": 22.0,
         "h_conv": 10.0,
-        "temp_limit_f": 75.0,
-        "hyst_f": 0.7,
+        "temp_limit_f": 105.0,
+        "hyst_f": 1.5,
         "z_max_m": z_max_m,
         "z_points": 300,
         "b_threshold_t": 1e-4,

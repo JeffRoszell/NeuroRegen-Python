@@ -17,8 +17,8 @@ H_CONV = 10.0
 T_AMB_C = 22.0
 
 # --- Thermal gating ---
-TEMP_LIMIT_F = 75.0
-HYST_F = 0.7
+TEMP_LIMIT_F = 105.0  # IEC 60601-1 skin contact limit (~40.6 °C)
+HYST_F = 1.5
 
 # --- Depth / B-field ---
 Z_MAX_M = 0.03

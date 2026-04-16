@@ -67,6 +67,6 @@ simulation:
 thermal:
   h_conv: 10.0                 # convective coefficient (W/m²/K)
   t_amb_c: 22.0                # ambient temperature (°C)
-  temp_limit_f: 75.0           # coil temperature limit (°F)
-  hyst_f: 0.7
+  temp_limit_f: 105.0          # coil temperature limit (°F) — IEC 60601-1 skin contact limit (~40.6 °C)
+  hyst_f: 1.5
   r_tissue_m: 0.005            # effective tissue loop radius for E-field (m)

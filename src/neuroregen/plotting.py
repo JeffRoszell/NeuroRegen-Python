@@ -3,6 +3,8 @@ Build and save the three standard plots (temperature, power, depth).
 Live-updating plot for interactive runs.
 """
 
+from __future__ import annotations
+
 import os
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
