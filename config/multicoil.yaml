@@ -75,8 +75,8 @@ simulation:
 thermal:
   h_conv: 10.0          # convective heat transfer (W/m²/K)
   t_amb_c: 22.0         # ambient temperature (°C)
-  temp_limit_f: 75.0    # skip pulses above this (°F)
-  hyst_f: 0.7           # resume below (limit − hyst) (°F)
+  temp_limit_f: 105.0   # skip pulses above this (°F)
+  hyst_f: 1.5           # resume below (limit − hyst) (°F)
 
 # --- Depth / B-field thresholds -------------------------------------------
 depth:
