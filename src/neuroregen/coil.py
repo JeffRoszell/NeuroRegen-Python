@@ -23,6 +23,9 @@ class Axis:
     loop_mm: float
     turns: int
     pulse_power_w: float
+    normal: tuple[float, float, float] = (0.0, 0.0, -1.0)
+    helix_height_mm: float = 0.0
+    segments_per_turn: int = 0
 
 
 def c_to_f(tc: float) -> float:

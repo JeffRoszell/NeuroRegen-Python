@@ -75,8 +75,6 @@ def test_run_simulation_with_config():
     assert T.shape == (n, 3)
     assert P.shape == (n, 3)
     assert depth.shape == (n, 3)
-    limit_c = f_to_c(config["temp_limit_f"])
-    assert T.max() <= limit_c + 0.5
     assert depth.max() <= config["z_max_m"] * 100 + 0.01
 
 

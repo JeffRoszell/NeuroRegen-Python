@@ -29,18 +29,21 @@ from __future__ import annotations
 
 import numpy as np
 from dataclasses import dataclass
-from typing import Callable, Generator
+from typing import TYPE_CHECKING, Callable, Generator, Optional
 
 from .constants import MU0, CP_CU, B_THRESHOLD_T
 from .coil import Axis, coil_geom, resistance, f_to_c
 from .thermal import thermal_gate_update, cooling_power, temp_step
 
+if TYPE_CHECKING:
+    from .ansys_field_map import AnsysFieldMap
+
 
 # ---------------------------------------------------------------------------
 # Safety defaults
 # ---------------------------------------------------------------------------
-E_FIELD_CORTICAL_MAX_VM: float = 150.0   # V/m — max induced E at cortex
-SCALP_TO_CORTEX_M: float = 0.015         # 1.5 cm (scalp + skull)
+E_FIELD_CORTICAL_MAX_VM: float = 150.0  # V/m — max induced E at cortex
+SCALP_TO_CORTEX_M: float = 0.015  # 1.5 cm (scalp + skull)
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +71,10 @@ class Coil:
     normal : tuple[float, float, float]
         Unit-normal of the coil plane — points toward the brain by
         convention (direction of the principal B-field axis).
+    helix_height_mm : float
+        Total height of the helix (mm).
+    segments_per_turn : int
+        Number of segments for field calculation.
     """
 
     name: str
@@ -77,6 +84,8 @@ class Coil:
     pulse_power_w: float
     position_m: tuple[float, float, float] = (0.0, 0.0, 0.0)
     normal: tuple[float, float, float] = (0.0, 0.0, -1.0)
+    helix_height_mm: float = 0.0
+    segments_per_turn: int = 0
 
     def __post_init__(self) -> None:
         n = np.asarray(self.normal, dtype=float)
@@ -93,6 +102,9 @@ class Coil:
             loop_mm=self.loop_mm,
             turns=self.turns,
             pulse_power_w=self.pulse_power_w,
+            normal=self.normal,
+            helix_height_mm=self.helix_height_mm,
+            segments_per_turn=self.segments_per_turn,
         )
 
 
@@ -130,43 +142,49 @@ class DepthGateResult:
 
 
 # ---------------------------------------------------------------------------
-# Geometry helpers
-# ---------------------------------------------------------------------------
-def euclidean_distance(
-    p1: tuple[float, float, float],
-    p2: tuple[float, float, float],
-) -> float:
-    """Euclidean distance between two 3-D points (m)."""
-    return float(np.sqrt(sum((a - b) ** 2 for a, b in zip(p1, p2))))
-
-
-
-# ---------------------------------------------------------------------------
 # Single-coil B-field in 3-D (with orientation)
 # ---------------------------------------------------------------------------
 def B_field_at_point(
     coil: Coil,
     I: float,
     point_m: tuple[float, float, float],
+    *,
+    field_map: Optional[AnsysFieldMap] = None,
 ) -> np.ndarray:
     """
     B-field vector (T) at an arbitrary 3-D point from a single coil.
 
-    Decomposes the coil-to-point vector into an axial distance (along the
-    coil normal) and a radial offset, applies the on-axis Biot–Savart
-    formula with an off-axis exponential decay factor, and rotates the
-    result into global coordinates using the coil's normal vector.
+    When *field_map* is supplied the result comes from linear interpolation
+    of an ANSYS Maxwell export (see :class:`~neuroregen.ansys_field_map.AnsysFieldMap`).
+    If the point lies outside the exported domain the map returns ``NaN``
+    and this function falls back to the analytical Biot–Savart formula
+    automatically.
+
+    Without *field_map* (or on fallback) the function decomposes the
+    coil-to-point vector into an axial distance (along the coil normal) and a
+    radial offset, applies the on-axis Biot–Savart formula with an off-axis
+    exponential decay factor, and rotates the result into global coordinates.
 
     Parameters
     ----------
     coil : Coil
     I : float   – current (A)
     point_m : 3-tuple of float  – target coordinates (m)
+    field_map : AnsysFieldMap, optional
+        If provided, the ANSYS interpolation table is queried first.
 
     Returns
     -------
     B_vec : ndarray, shape (3,)  – (Bx, By, Bz) in Tesla
     """
+    # --- ANSYS lookup (with graceful out-of-bounds fallback) -----------------
+    if field_map is not None:
+        B_ansys = field_map.B_at_point(point_m, current_A=I)
+        if not np.any(np.isnan(B_ansys)):
+            return B_ansys
+        # Out-of-bounds → fall through to analytical
+
+    # --- Analytical Biot–Savart (N-turn circular loop) -----------------------
     R_loop = coil.loop_mm / 2000.0
     N = coil.turns
 
@@ -180,7 +198,7 @@ def B_field_at_point(
 
     # On-axis B magnitude (Biot–Savart for N-turn loop)
     z_abs = abs(z_axial)
-    B_axial_mag = MU0 * I * R_loop ** 2 / (2.0 * (R_loop ** 2 + z_abs ** 2) ** 1.5) * N
+    B_axial_mag = MU0 * I * R_loop**2 / (2.0 * (R_loop**2 + z_abs**2) ** 1.5) * N
 
     # Off-axis decay (exponential approximation, scale length ~ 2R)
     scale = np.exp(-rho / (R_loop * 2.0)) if rho > 0 else 1.0
@@ -204,7 +222,8 @@ def B_field_at_point(
 # ---------------------------------------------------------------------------
 def compute_coil_distances(coils: list[Coil], target: Target) -> np.ndarray:
     """Euclidean distances (m) from each coil centre to the target."""
-    return np.array([euclidean_distance(c.position_m, target.position_m) for c in coils])
+    t = np.asarray(target.position_m)
+    return np.array([float(np.linalg.norm(np.asarray(c.position_m) - t)) for c in coils])
 
 
 def compute_cosine_factors(coils: list[Coil], target: Target) -> np.ndarray:
@@ -245,7 +264,7 @@ def compute_distance_weights(
     Weight ∝ ``d^6`` (distance compensation) ÷ ``cos θ`` (tilt correction).
     """
     distances = compute_coil_distances(coils, target)
-    weights = distances ** 6
+    weights = distances**6
 
     if include_cosine:
         cos_f = np.clip(compute_cosine_factors(coils, target), 0.1, 1.0)
@@ -304,9 +323,9 @@ def E_field_at_surface(
     N = coil.turns
     z = surface_distance_m
 
-    B_surface = MU0 * I * R_loop ** 2 / (2.0 * (R_loop ** 2 + z ** 2) ** 1.5) * N
-    dBdt = B_surface * np.pi / pulse_width   # peak dB/dt for a half-sine pulse
-    return float((R_loop / 2.0) * dBdt)     # Faraday: E = (r/2) × dB/dt
+    B_surface = MU0 * I * R_loop**2 / (2.0 * (R_loop**2 + z**2) ** 1.5) * N
+    dBdt = B_surface * np.pi / pulse_width  # peak dB/dt for a half-sine pulse
+    return float((R_loop / 2.0) * dBdt)  # Faraday: E = (r/2) × dB/dt
 
 
 def check_depth_gate(
@@ -327,29 +346,29 @@ def check_depth_gate(
     all_safe = True
 
     for i, coil in enumerate(coils):
-        ax = coil.to_axis()
-        _, L, A, _, _ = coil_geom(ax)
-        R_ohm = resistance(L, A, float(temperatures_c[i]))
         Pin = float(weighted_powers[i])
 
         if Pin <= 0:
-            per_coil.append(dict(
-                coil=coil.name, E_surface_vm=0.0,
-                limit_vm=cortical_max_vm, passed=True, current_A=0.0,
-            ))
-            continue
+            I, E_surf, passed = 0.0, 0.0, True
+        else:
+            ax = coil.to_axis()
+            _, L, A, _, _ = coil_geom(ax)
+            R_ohm = resistance(L, A, float(temperatures_c[i]))
+            I = np.sqrt(Pin / R_ohm)
+            E_surf = E_field_at_surface(coil, I, pulse_width, surface_distance_m)
+            passed = E_surf <= cortical_max_vm
+            if not passed:
+                all_safe = False
 
-        I = np.sqrt(Pin / R_ohm)
-        E_surf = E_field_at_surface(coil, I, pulse_width, surface_distance_m)
-        passed = E_surf <= cortical_max_vm
-
-        if not passed:
-            all_safe = False
-
-        per_coil.append(dict(
-            coil=coil.name, E_surface_vm=E_surf,
-            limit_vm=cortical_max_vm, passed=passed, current_A=I,
-        ))
+        per_coil.append(
+            dict(
+                coil=coil.name,
+                E_surface_vm=E_surf,
+                limit_vm=cortical_max_vm,
+                passed=passed,
+                current_A=I,
+            )
+        )
 
     return DepthGateResult(safe=all_safe, per_coil=per_coil)
 
@@ -362,12 +381,20 @@ def superposed_B_at_target(
     weighted_powers: np.ndarray,
     temperatures_c: np.ndarray,
     target: Target,
+    *,
+    field_maps: Optional[list[Optional[AnsysFieldMap]]] = None,
 ) -> tuple[np.ndarray, float]:
     """
     Total B-field vector & magnitude (T) at the target from all coils.
 
     Each coil's field (at its weighted power and current temperature) is
     computed via :func:`B_field_at_point` and the vectors are summed.
+
+    Parameters
+    ----------
+    field_maps : list of AnsysFieldMap or None, optional
+        One entry per coil.  ``None`` entries fall back to the analytical
+        Biot–Savart formula for that coil.
     """
     B_total = np.zeros(3)
     for i, coil in enumerate(coils):
@@ -378,7 +405,8 @@ def superposed_B_at_target(
         _, L, A, _, _ = coil_geom(ax)
         R_ohm = resistance(L, A, float(temperatures_c[i]))
         I = np.sqrt(Pin / R_ohm)
-        B_total += B_field_at_point(coil, I, target.position_m)
+        fm = field_maps[i] if (field_maps is not None and i < len(field_maps)) else None
+        B_total += B_field_at_point(coil, I, target.position_m, field_map=fm)
 
     return B_total, float(np.linalg.norm(B_total))
 
@@ -390,6 +418,8 @@ def superposed_B_on_grid(
     X: np.ndarray,
     Y: np.ndarray,
     Z: np.ndarray,
+    *,
+    field_maps: Optional[list[Optional[AnsysFieldMap]]] = None,
 ) -> np.ndarray:
     """
     Superposed |B| on a 3-D meshgrid from all coils.
@@ -399,7 +429,20 @@ def superposed_B_on_grid(
     captures constructive / destructive interference and shows the true
     focal-point convergence.
 
-    Returns an array the same shape as *X* (and *Y*, *Z*).
+    When *field_maps* is supplied, each coil's contribution is looked up from
+    its ANSYS interpolation table (vectorised over all grid points) and only
+    falls back to the analytical formula for out-of-bounds points.
+
+    Parameters
+    ----------
+    field_maps : list of AnsysFieldMap or None, optional
+        One entry per coil.  Enables vectorised ANSYS lookups and is
+        significantly faster than the per-point analytical loop for large
+        field-map exports.
+
+    Returns
+    -------
+    ndarray, same shape as *X*  –  |B| magnitude in Tesla
     """
     shape = X.shape
     pts = np.stack([X.ravel(), Y.ravel(), Z.ravel()], axis=1)
@@ -417,8 +460,24 @@ def superposed_B_on_grid(
         R_ohm = resistance(L, A, float(temperatures_c[i]))
         I = np.sqrt(Pin / R_ohm)
 
-        for j in range(n_pts):
-            B_vec_total[j] += B_field_at_point(coil, I, tuple(pts[j]))
+        fm = field_maps[i] if (field_maps is not None and i < len(field_maps)) else None
+
+        if fm is not None:
+            # Vectorised ANSYS lookup — one call for all grid points
+            B_ansys = fm.B_at_points(pts, current_A=I)  # (n_pts, 3)
+            nan_rows = np.any(np.isnan(B_ansys), axis=1)
+
+            # Add valid ANSYS points directly
+            valid = ~nan_rows
+            if np.any(valid):
+                B_vec_total[valid] += B_ansys[valid]
+
+            # Analytical fallback only for out-of-bounds points
+            for j in np.where(nan_rows)[0]:
+                B_vec_total[j] += B_field_at_point(coil, I, tuple(pts[j]))
+        else:
+            for j in range(n_pts):
+                B_vec_total[j] += B_field_at_point(coil, I, tuple(pts[j]))
 
     # Magnitude of the vector sum
     B_mag = np.linalg.norm(B_vec_total, axis=1)
@@ -435,6 +494,8 @@ def surface_to_deep_ratio(
     target: Target,
     pulse_width: float,
     surface_distance_m: float = SCALP_TO_CORTEX_M,
+    *,
+    field_maps: Optional[list[Optional[AnsysFieldMap]]] = None,
 ) -> dict:
     """
     The Surface-to-Deep Ratio — the biggest safety metric for deep
@@ -465,7 +526,13 @@ def surface_to_deep_ratio(
             max_E = E_surf
             worst = coil.name
 
-    _, B_mag = superposed_B_at_target(coils, weighted_powers, temperatures_c, target)
+    _, B_mag = superposed_B_at_target(
+        coils,
+        weighted_powers,
+        temperatures_c,
+        target,
+        field_maps=field_maps,
+    )
     R_avg = np.mean([c.loop_mm / 2000.0 for c in coils])
     E_target = R_avg * B_mag * 2.0 / pulse_width
     ratio = max_E / E_target if E_target > 0 else float("inf")
@@ -497,12 +564,16 @@ class MulticoilArray:
         target: Target,
         cortical_max_vm: float = E_FIELD_CORTICAL_MAX_VM,
         surface_distance_m: float = SCALP_TO_CORTEX_M,
+        field_maps: Optional[list[Optional[AnsysFieldMap]]] = None,
     ):
         self.coils = coils
         self.target = target
         self.cortical_max_vm = cortical_max_vm
         self.surface_distance_m = surface_distance_m
         self.n_coils = len(coils)
+
+        # ANSYS field maps (one per coil, or None to use analytical)
+        self.field_maps: Optional[list[Optional[AnsysFieldMap]]] = field_maps
 
         # Pre-computed static geometry
         self.distances = compute_coil_distances(coils, target)
@@ -538,13 +609,22 @@ class MulticoilArray:
         """
         Superposed B-field vector and magnitude at the target.
 
+        Uses ANSYS field maps when available; falls back to analytical
+        Biot–Savart for coils without a map or for out-of-bounds points.
+
         *active_mask* is a boolean array the same length as ``coils``; when a
         coil is ``False`` it is excluded (disabled or thermally gated).
         """
         powers = self.weighted_powers.copy()
         if active_mask is not None:
             powers *= np.asarray(active_mask, dtype=float)
-        return superposed_B_at_target(self.coils, powers, temperatures_c, self.target)
+        return superposed_B_at_target(
+            self.coils,
+            powers,
+            temperatures_c,
+            self.target,
+            field_maps=self.field_maps,
+        )
 
     def get_surface_to_deep_ratio(
         self,
@@ -558,6 +638,7 @@ class MulticoilArray:
             self.target,
             pulse_width,
             self.surface_distance_m,
+            field_maps=self.field_maps,
         )
 
     # ---- pretty-print -------------------------------------------------------
@@ -572,13 +653,11 @@ class MulticoilArray:
         t = self.target
         lines.append(
             f"Target : {t.name}  at  "
-            f"({t.position_m[0]*100:+.2f}, {t.position_m[1]*100:+.2f}, "
-            f"{t.position_m[2]*100:+.2f}) cm"
+            f"({t.position_m[0] * 100:+.2f}, {t.position_m[1] * 100:+.2f}, "
+            f"{t.position_m[2] * 100:+.2f}) cm"
         )
         lines.append(f"Cortical E-field limit    : {self.cortical_max_vm:.0f} V/m")
-        lines.append(
-            f"Scalp-to-cortex distance  : {self.surface_distance_m*100:.1f} cm"
-        )
+        lines.append(f"Scalp-to-cortex distance  : {self.surface_distance_m * 100:.1f} cm")
         lines.append("")
 
         hdr = (
@@ -586,10 +665,7 @@ class MulticoilArray:
             f"{'Base P':>8} {'Wt P':>8} {'E_surf':>9} {'Gate':>6}"
         )
         lines.append(hdr)
-        unit = (
-            f"{'':6} {'(cm)':>7} {'':>7} {'':>7} "
-            f"{'(W)':>8} {'(W)':>8} {'(V/m)':>9} {'':>6}"
-        )
+        unit = f"{'':6} {'(cm)':>7} {'':>7} {'':>7} {'(W)':>8} {'(W)':>8} {'(V/m)':>9} {'':>6}"
         lines.append(unit)
         lines.append("-" * w)
 
@@ -599,7 +675,7 @@ class MulticoilArray:
             r = gate.per_coil[i]
             flag = "PASS" if r["passed"] else "FAIL"
             lines.append(
-                f"{coil.name:<6} {self.distances[i]*100:7.2f} "
+                f"{coil.name:<6} {self.distances[i] * 100:7.2f} "
                 f"{self.cosine_factors[i]:7.3f} {self.weights[i]:7.2f} "
                 f"{coil.pulse_power_w:8.1f} {self.weighted_powers[i]:8.1f} "
                 f"{r['E_surface_vm']:9.2f} {flag:>6}"
@@ -609,15 +685,14 @@ class MulticoilArray:
 
         B_vec, B_mag = self.B_at_target(temperatures_c)
         lines.append(
-            f"Combined B at target : {B_mag*1000:.4f} mT  "
-            f"({B_vec[0]*1000:+.4f}, {B_vec[1]*1000:+.4f}, "
-            f"{B_vec[2]*1000:+.4f}) mT"
+            f"Combined B at target : {B_mag * 1000:.4f} mT  "
+            f"({B_vec[0] * 1000:+.4f}, {B_vec[1] * 1000:+.4f}, "
+            f"{B_vec[2] * 1000:+.4f}) mT"
         )
 
         sdr = self.get_surface_to_deep_ratio(temperatures_c, pulse_width)
         lines.append(
-            f"Surface-to-Deep Ratio: {sdr['ratio']:.2f}  "
-            f"(worst coil: {sdr['worst_coil']})"
+            f"Surface-to-Deep Ratio: {sdr['ratio']:.2f}  (worst coil: {sdr['worst_coil']})"
         )
 
         status = "PASS" if gate.safe else "FAIL — PULSE BLOCKED"
@@ -692,8 +767,10 @@ def run_multicoil_simulation(
         # --- thermal gating per coil ---
         for i in range(nc):
             gated_off[i] = thermal_gate_update(
-                T[k - 1, i], gated_off[i],
-                limit_c=p["limit_c"], hyst_c=p["hyst_c"],
+                T[k - 1, i],
+                gated_off[i],
+                limit_c=p["limit_c"],
+                hyst_c=p["hyst_c"],
             )
 
         # Active mask: pulse on AND not thermally gated
@@ -705,8 +782,11 @@ def run_multicoil_simulation(
         # --- depth gate ---
         if np.any(active):
             gate = check_depth_gate(
-                array.coils, w_powers, T[k - 1],
-                p["pulse_width"], array.cortical_max_vm,
+                array.coils,
+                w_powers,
+                T[k - 1],
+                p["pulse_width"],
+                array.cortical_max_vm,
                 array.surface_distance_m,
             )
             depth_gate[k] = gate.safe
@@ -727,20 +807,25 @@ def run_multicoil_simulation(
             P[k, i] = Pin
 
             Pcool = cooling_power(
-                T[k - 1, i], S,
-                h_conv=p["h_conv"], t_amb_c=p["t_amb_c"],
+                T[k - 1, i],
+                S,
+                h_conv=p["h_conv"],
+                t_amb_c=p["t_amb_c"],
             )
             T[k, i] = temp_step(T[k - 1, i], Pin, Pcool, Cth[i], p["dt"])
 
         # --- superposed B at target ---
         if np.any(active) and depth_gate[k]:
             _, B_mag = superposed_B_at_target(
-                array.coils, w_powers, T[k - 1], array.target,
+                array.coils,
+                w_powers,
+                T[k - 1],
+                array.target,
+                field_maps=array.field_maps,
             )
             B_target[k] = B_mag
 
-    return dict(t=t, T=T, P=P, B_target=B_target,
-                E_surface=E_surface, depth_gate=depth_gate)
+    return dict(t=t, T=T, P=P, B_target=B_target, E_surface=E_surface, depth_gate=depth_gate)
 
 
 def run_multicoil_simulation_stepwise(
@@ -764,11 +849,7 @@ def run_multicoil_simulation_stepwise(
     p = _mc_sim_params(config)
     nc = array.n_coils
 
-    if coil_enabled is None:
-        coil_enabled = [True] * nc
-    coil_enabled = list(coil_enabled)[:nc]
-    while len(coil_enabled) < nc:
-        coil_enabled.append(True)
+    coil_enabled = (list(coil_enabled or []) + [True] * nc)[:nc]
 
     t = np.arange(0, p["sim_time"], p["dt"])
     n = len(t)
@@ -796,21 +877,23 @@ def run_multicoil_simulation_stepwise(
             if not coil_enabled[i]:
                 continue
             gated_off[i] = thermal_gate_update(
-                T[k - 1, i], gated_off[i],
-                limit_c=p["limit_c"], hyst_c=p["hyst_c"],
+                T[k - 1, i],
+                gated_off[i],
+                limit_c=p["limit_c"],
+                hyst_c=p["hyst_c"],
             )
 
-        active = np.array([
-            pulse_on and coil_enabled[i] and not gated_off[i]
-            for i in range(nc)
-        ])
+        active = np.array([pulse_on and coil_enabled[i] and not gated_off[i] for i in range(nc)])
         w_powers = array.weighted_powers * active.astype(float)
 
         gate_ok = True
         if np.any(active):
             gate = check_depth_gate(
-                array.coils, w_powers, T[k - 1],
-                p["pulse_width"], array.cortical_max_vm,
+                array.coils,
+                w_powers,
+                T[k - 1],
+                p["pulse_width"],
+                array.cortical_max_vm,
                 array.surface_distance_m,
             )
             gate_ok = gate.safe
@@ -829,27 +912,44 @@ def run_multicoil_simulation_stepwise(
                 Pin = float(w_powers[i])
             P[k, i] = Pin
             Pcool = cooling_power(
-                T[k - 1, i], S,
-                h_conv=p["h_conv"], t_amb_c=p["t_amb_c"],
+                T[k - 1, i],
+                S,
+                h_conv=p["h_conv"],
+                t_amb_c=p["t_amb_c"],
             )
             T[k, i] = temp_step(T[k - 1, i], Pin, Pcool, Cth[i], p["dt"])
 
         if np.any(active) and gate_ok:
             _, B_mag = superposed_B_at_target(
-                array.coils, w_powers, T[k - 1], array.target,
+                array.coils,
+                w_powers,
+                T[k - 1],
+                array.target,
+                field_maps=array.field_maps,
             )
             B_target[k] = B_mag
 
         last_k = k
         yield (
-            "step", k, t[k],
-            T[k].copy(), P[k].copy(),
-            B_target[k], E_surface[k].copy(), gate_ok,
+            "step",
+            k,
+            t[k],
+            T[k].copy(),
+            P[k].copy(),
+            B_target[k],
+            E_surface[k].copy(),
+            gate_ok,
         )
 
     K = last_k + 1
     yield (
         "final",
-        dict(t=t[:K], T=T[:K], P=P[:K], B_target=B_target[:K],
-             E_surface=E_surface[:K], depth_gate=depth_gate[:K]),
+        dict(
+            t=t[:K],
+            T=T[:K],
+            P=P[:K],
+            B_target=B_target[:K],
+            E_surface=E_surface[:K],
+            depth_gate=depth_gate[:K],
+        ),
     )

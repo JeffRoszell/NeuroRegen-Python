@@ -1,7 +1,4 @@
-"""
-Main simulation loop: time array, axes, thermal gating, power, temperature, depth.
-Stepwise generator for interactive/live use with axis enable and stop check.
-"""
+from __future__ import annotations
 
 import numpy as np
 from typing import Callable, Generator
@@ -16,9 +13,10 @@ from .constants import (
     Z_POINTS,
     B_THRESHOLD_T,
     CP_CU,
+    H_CONV,
 )
 from .coil import Axis, coil_geom, resistance, B_loop, f_to_c
-from .thermal import thermal_gate_update, cooling_power, temp_step
+from .thermal import thermal_gate_update, cooling_power, temp_step, LIMIT_C, HYST_C
 
 
 def default_axes():
@@ -63,12 +61,12 @@ def run_simulation(
         pulse_width = pulse_width if pulse_width is not None else PULSE_WIDTH
         axes = default_axes() if axes is None else axes
         t_amb_c = T_AMB_C
-        h_conv = None  # use constants in cooling_power
+        h_conv = H_CONV
         z_max_m = Z_MAX_M
         z_points = Z_POINTS
         b_threshold_t = B_THRESHOLD_T
-        limit_c = None  # thermal_gate_update uses its defaults
-        hyst_c = None
+        limit_c = LIMIT_C
+        hyst_c = HYST_C
 
     t = np.arange(0, sim_time, dt)
     z = np.linspace(0, z_max_m, z_points)
@@ -110,17 +108,6 @@ def run_simulation(
 
 def _sim_params_from_config(config: dict | None):
     """Build simulation parameters from config or defaults. Returns dict with keys needed for stepwise run."""
-    from .constants import (
-        SIM_TIME,
-        DT,
-        PULSE_FREQ,
-        PULSE_WIDTH,
-        T_AMB_C,
-        Z_MAX_M,
-        Z_POINTS,
-        B_THRESHOLD_T,
-    )
-
     if config is not None:
         return {
             "sim_time": config["sim_time"],
@@ -144,12 +131,12 @@ def _sim_params_from_config(config: dict | None):
         "pulse_width": PULSE_WIDTH,
         "axes": axes,
         "t_amb_c": T_AMB_C,
-        "h_conv": None,
+        "h_conv": H_CONV,
         "z_max_m": Z_MAX_M,
         "z_points": Z_POINTS,
         "b_threshold_t": B_THRESHOLD_T,
-        "limit_c": None,
-        "hyst_c": None,
+        "limit_c": LIMIT_C,
+        "hyst_c": HYST_C,
     }
 
 
@@ -178,12 +165,8 @@ def run_simulation_stepwise(
     limit_c = params["limit_c"]
     hyst_c = params["hyst_c"]
 
-    if axis_enabled is None:
-        axis_enabled = [True] * len(axes)
     n_axes = len(axes)
-    axis_enabled = list(axis_enabled)[:n_axes]
-    if len(axis_enabled) < n_axes:
-        axis_enabled.extend([True] * (n_axes - len(axis_enabled)))
+    axis_enabled = (list(axis_enabled or []) + [True] * n_axes)[:n_axes]
 
     t = np.arange(0, sim_time, dt)
     z = np.linspace(0, z_max_m, z_points)

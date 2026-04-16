@@ -1,88 +1,94 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with code in this repository.
 
 ## Commands
 
 ### Setup
 ```bash
 python3 -m venv venv
-source venv/bin/activate       # Mac/Linux
+source venv/bin/activate
 pip install -r requirements.txt
+pre-commit install --hook-type pre-commit --hook-type commit-msg
 ```
 
-### Run simulations
+### Run
 ```bash
-python scripts/run_simulation.py                    # Single-coil 3-axis
-python scripts/run_simulation.py --field-maps       # With spatial field maps
-python scripts/run_interactive.py                   # Menu-driven interactive controller
+python scripts/run_simulation.py                    # Single-coil 3-axis (30 min)
+python scripts/run_simulation.py --field-maps       # + spatial B-field maps
+python scripts/run_interactive.py                   # Menu-driven FSM controller
 python scripts/run_multicoil.py                     # Multicoil deep-brain targeting
-python scripts/run_multicoil.py --field-map --3d    # With 2D map and interactive 3D HTML
+python scripts/run_multicoil.py --field-map --3d    # + 2D focus map + 3D HTML
+python scripts/run_pulsed.py                        # Pulsed capacitor-discharge sim
+python scripts/run_pulsed.py --plot                 # + voltage sweep / depth / waveform plots
+python scripts/generate_ansys_sample.py             # Generate synthetic ANSYS CSV exports
+# Any script accepts -c path/to/cfg.yaml for a custom config
 ```
 
-### Test
+### Test & Lint
 ```bash
-python -m pytest tests/ -v                                            # All tests
-python -m pytest tests/test_coil.py -v                               # Single file
-python -m pytest tests/test_thermal.py::test_gate_off_at_limit -v    # Single test
-```
-
-### Lint
-```bash
+python -m pytest tests/ -v
+python -m pytest tests/test_coil.py::test_name -v  # single test
 ruff check src/ scripts/ tests/
 ruff format --check src/ scripts/ tests/
 ```
 
-Ruff config is in `pyproject.toml`: line length 100, target Python 3.9, ignores `E741` (allows `I` for current) and `F841`.
+### Pre-commit
+Hooks run automatically on `git commit`: ruff (lint + format), codespell, pytest, conventional commit validation.
+
+### Commits
+[Conventional Commits](https://www.conventionalcommits.org/) enforced by hook.
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
 
 ## Architecture
 
-NeuroRegen simulates magnetic coil stimulation for deep-brain neuromodulation research, targeting the Subthalamic Nucleus. It has two operating modes driven by YAML config files in `config/`.
+NeuroRegen simulates magnetic coil stimulation targeting the Subthalamic Nucleus (STN). Three simulations driven by YAML configs in `config/`.
 
-### Module layers
+### The Three Simulations
 
-**Physics** (`src/neuroregen/`):
-- `coil.py` — coil geometry, temperature-dependent resistance, on-axis B-field (Biot-Savart), penetration depth
-- `thermal.py` — heat balance, convective cooling, thermal gating with hysteresis
-- `constants.py` — physical constants (μ₀, ρ_Cu, thermal properties)
+| Script | Config | Purpose |
+|---|---|---|
+| `run_simulation.py` | `default.yaml` | Single-coil 3-axis, continuous-wave, thermal gating |
+| `run_multicoil.py` | `multicoil.yaml` | 3-coil array, distance-compensated targeting, depth-gate safety |
+| `run_pulsed.py` | `pulsed_tms.yaml` | Capacitor-discharge physics, matches ANSYS AEDT build |
 
-**Simulation**:
-- `simulation.py` — single-coil 3-axis stepwise loop; per-axis thermal gating and depth tracking
-- `multicoil.py` (879 lines) — multicoil physics: Coil/Target dataclasses, 3D B-field with rotation matrices, distance-weighted power (inverse-cube), cosine-factor alignment, field superposition, cortical E-field depth-gate safety check
+### Current Hardware / ANSYS Build
 
-**Control**:
-- `state_machine.py` — 4-state FSM: `OFF → ARMED → FIRING → FAULT`
-- `controller.py` — wraps FSM, per-axis enable/disable, run loop, CSV logging, live plotting
+All three configs now use the same physical coil geometry (matching `3AxisTeslaCoil_6Turns_10mmWire_150mmLargest_SeparateLeads_300mm_Apr15.aedt`):
+- **6 turns**, **150 mm loop diameter**, **10 mm wire**
+- **200 µF** capacitor bank, **798 V** charge voltage (pulsed mode)
+- Peak current: ~3,674 A, pulse half-period: ~137 µs
 
-**Output**:
-- `plotting.py` — live matplotlib plots and static result figures
-- `field_mapping.py` — 2D/3D spatial field maps, contour plots, interactive HTML slices
-- `csv_logger.py` — time-series CSV export
+### Modules (`src/neuroregen/`)
+- **Physics**: `coil.py`, `thermal.py`, `pulsed.py` (LC discharge), `constants.py`
+- **Simulation**: `simulation.py` (single-coil 3-axis), `multicoil.py` (multicoil targeting + field)
+- **Control**: `state_machine.py` (OFF→ARMED→FIRING→FAULT FSM), `controller.py`
+- **Config**: `config_loader.py` (YAML parsing for all three modes)
+- **Output**: `plotting.py`, `field_mapping.py`, `csv_logger.py`
+- **ANSYS**: `ansys_field_map.py` (load CSV exports), `ansys_connection.py` (live pyaedt)
 
-### Data flow
-```
-YAML config → load_config / load_multicoil_config
-           → Axis / Coil / Target objects
-           → run_*_simulation_stepwise (per timestep: pulse?, thermal gate?, B-field, ΔT)
-           → outputs/ PNG plots + optional HTML 3D
-           → (interactive) CSV logs to outputs/logs/run_TIMESTAMP.csv
-```
+### Key Design Rules
+- All tunable parameters in YAML configs — no hardcoded sim values in source
+- Thermal gating with hysteresis: skip pulses at 75°F limit, resume at 74.3°F
+- Multicoil depth gate: block entire pulse if any coil exceeds 150 V/m cortical E-field
+- Distance compensation: weights ∝ distance⁶ so all coils deliver equal field at target
+- ANSYS field maps are optional; falls back to analytical Biot-Savart when absent
+- Ruff: line length 100, Python 3.9 target, ignores `E741` (allows `I` for current) and `F841`
 
-### Key physics
+### Known Issue
+In `pulsed.py`, cortical E-field uses the coil loop radius (75 mm) as the tissue loop radius — this is conservative (overestimates cortical E by ~4–15×). The reported value won't match SimNIBS or ANSYS output directly. Target E-field at STN uses the configurable `r_tissue_m` (default 5 mm), which is more realistic.
 
-**Single-coil** (per axis):
-- B(z) = μ₀ I R² N / (2(R²+z²)^1.5)
-- R(T) = ρ L/A × (1 + α(T − 20°C))
-- Thermal: dT/dt = (P_in − h·S·(T − T_amb)) / C_thermal
+## CI
+GitHub Actions (`.github/workflows/ci.yml`) runs pytest and ruff on Python 3.9/3.10/3.11.
 
-**Multicoil** (novel additions in `multicoil.py`):
-- Distance weight: w_i = (d_max / d_i)³
-- Cosine alignment: cos θ = n_coil · (target − pos_coil) / |...|
-- Weighted power: P_i = w_i × P_base × cos θ_i
-- Safety depth gate: if any coil's cortical E-field > 150 V/m, entire pulse is blocked
+## Agents
 
-### Configuration
-All tunable parameters live in `config/default.yaml` (single-coil) and `config/multicoil.yaml` (multicoil STN targeting). No hardcoded simulation values in source.
+Custom agents in `.claude/agents/`.
 
-### CI
-GitHub Actions (`.github/workflows/ci.yml`) runs pytest and ruff on Python 3.9/3.10/3.11 for pushes to `main` and `feature/menu-interface-state-machine`.
+| Agent | Role |
+|-------|------|
+| `orchestrator-builder` | Default — builds features, fixes bugs |
+| `code-reviewer` | Runs ruff, pytest, manual review (read-only) |
+| `code-simplifier` | Simplifies recently written code |
+| `neuro-research-lookup` | TMS/STN academic references |
+| `ansys-simnibs-expert` | PyAEDT / SimNIBS integration guidance |

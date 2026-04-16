@@ -26,8 +26,8 @@ from __future__ import annotations
 import numpy as np
 from dataclasses import dataclass
 
-from .constants import MU0, RHO_CU, DENSITY_CU, CP_CU
-from .coil import Axis, coil_geom, resistance
+from .constants import MU0, CP_CU
+from .coil import coil_geom, resistance
 from .multicoil import Coil, Target, B_field_at_point
 
 
@@ -53,7 +53,7 @@ def coil_inductance(R_m: float, N: int, wire_radius_m: float) -> float:
         Inductance in Henries.
     """
     L1 = MU0 * R_m * (np.log(8.0 * R_m / wire_radius_m) - 2.0)
-    return float(N ** 2 * L1)
+    return float(N**2 * L1)
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ def discharge_params(C: float, V: float, L: float) -> dict:
     """
     I_peak = V * np.sqrt(C / L)
     tau_s = np.pi * np.sqrt(L * C)
-    E_pulse = 0.5 * C * V ** 2
+    E_pulse = 0.5 * C * V**2
     return dict(I_peak_A=float(I_peak), tau_s=float(tau_s), E_pulse_J=float(E_pulse))
 
 
@@ -111,7 +111,7 @@ def B_peak_on_axis(I_peak: float, R_coil: float, z: float, N: int) -> float:
 
     Uses the exact Biot-Savart on-axis formula.
     """
-    return float(MU0 * I_peak * R_coil ** 2 * N / (2.0 * (R_coil ** 2 + z ** 2) ** 1.5))
+    return float(MU0 * I_peak * R_coil**2 * N / (2.0 * (R_coil**2 + z**2) ** 1.5))
 
 
 def E_induced_peak(B_peak: float, r_tissue: float, tau_s: float) -> float:
@@ -137,35 +137,12 @@ def heat_per_pulse(R_ohm: float, I_peak: float, tau_s: float) -> float:
 
     For I(t) = I_peak sin(πt/τ):   ∫₀^τ I²R dt = R × I_peak² × τ/2
     """
-    return float(R_ohm * I_peak ** 2 * tau_s / 2.0)
+    return float(R_ohm * I_peak**2 * tau_s / 2.0)
 
 
 # ---------------------------------------------------------------------------
 # Superposed field at the target (3-D vector sum)
 # ---------------------------------------------------------------------------
-def superposed_B_peak(
-    coils: list[Coil],
-    I_peaks: list[float],
-) -> tuple[np.ndarray, float]:
-    """
-    Peak superposed B-field vector and magnitude (T) at each coil's target.
-
-    Assumes all coils fire simultaneously with their respective peak currents.
-
-    Parameters
-    ----------
-    coils   : list of Coil (carries position, normal, target via array.target)
-    I_peaks : list of float – peak current per coil (A)
-
-    Returns
-    -------
-    (B_vec, B_mag) : ndarray shape (3,), float
-        B-field vector (T) and magnitude (T) at the first coil's target.
-        (All coils in an array share the same target by convention.)
-    """
-    target_pos = coils[0].position_m   # placeholder; caller passes target explicitly
-
-
 def superposed_B_peak_at(
     coils: list[Coil],
     I_peaks: list[float],
@@ -198,15 +175,16 @@ def superposed_B_peak_at(
 @dataclass
 class PulsedSimResult:
     """Results from :func:`run_pulsed_thermal_sim`."""
-    t_s: np.ndarray            # time axis (s), one point per pulse
-    T_c: np.ndarray            # coil temperature (°C) [n_pulses, n_coils]
-    B_target_T: np.ndarray     # peak |B| at target per pulse (T)
-    E_surface_vm: np.ndarray   # peak cortical E per coil per pulse (V/m) [n_pulses, n_coils]
-    E_target_vm: np.ndarray    # peak induced E at target per pulse (V/m)
-    Q_pulse_J: np.ndarray      # heat deposited per coil per pulse (J) [n_coils]
-    I_peaks_A: np.ndarray      # peak current per coil (A) [n_coils]
-    tau_s: float               # pulse half-width (s)
-    discharge: dict            # discharge_params result (per coil, all identical if same V)
+
+    t_s: np.ndarray  # time axis (s), one point per pulse
+    T_c: np.ndarray  # coil temperature (°C) [n_pulses, n_coils]
+    B_target_T: np.ndarray  # peak |B| at target per pulse (T)
+    E_surface_vm: np.ndarray  # peak cortical E per coil per pulse (V/m) [n_pulses, n_coils]
+    E_target_vm: np.ndarray  # peak induced E at target per pulse (V/m)
+    Q_pulse_J: np.ndarray  # heat deposited per coil per pulse (J) [n_coils]
+    I_peaks_A: np.ndarray  # peak current per coil (A) [n_coils]
+    tau_s: float  # pulse half-width (s)
+    discharge: dict  # discharge_params result (per coil, all identical if same V)
 
 
 def run_pulsed_thermal_sim(
@@ -318,5 +296,5 @@ def run_pulsed_thermal_sim(
         Q_pulse_J=Q_pulses,
         I_peaks_A=np.array(I_peaks),
         tau_s=float(np.mean(taus)),
-        discharge=discharges[0],   # representative (all coils same geometry)
+        discharge=discharges[0],  # representative (all coils same geometry)
     )

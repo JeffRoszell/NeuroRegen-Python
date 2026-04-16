@@ -9,6 +9,7 @@ Supports two config formats:
 
 import os
 from pathlib import Path
+from typing import Optional, Union
 
 from .coil import Axis
 
@@ -24,7 +25,7 @@ except ImportError:
 def _project_root() -> Path:
     """Return the repo root (parent of ``src/``)."""
     pkg_dir = Path(__file__).resolve().parent  # .../src/neuroregen
-    return pkg_dir.parent.parent               # .../Python Code
+    return pkg_dir.parent.parent  # .../Python Code
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +63,8 @@ def load_config(path: str | os.PathLike | None = None) -> dict:
             loop_mm=float(a["loop_mm"]),
             turns=int(a["turns"]),
             pulse_power_w=float(a["pulse_power_w"]),
+            helix_height_mm=float(a.get("helix_height_mm", 0.0)),
+            segments_per_turn=int(a.get("segments_per_turn", 0)),
         )
         for a in axes_spec
     ]
@@ -80,6 +83,43 @@ def load_config(path: str | os.PathLike | None = None) -> dict:
         "b_threshold_t": float(depth.get("b_threshold_t", 1e-4)),
         "axes": axes,
     }
+
+
+# ---------------------------------------------------------------------------
+# Shared parsing helpers for multicoil / pulsed configs
+# ---------------------------------------------------------------------------
+def _parse_target(raw: dict) -> dict:
+    """Parse the ``target`` section from a YAML config."""
+    tgt = raw.get("target", {})
+    return dict(
+        name=tgt.get("name", "unknown"),
+        position_m=tuple(float(v) for v in tgt.get("position_m", [0, 0, 0])),
+    )
+
+
+def _parse_coils(raw: dict, power_default: float | None = None) -> list[dict]:
+    """Parse the ``coils`` section from a YAML config."""
+    coils = []
+    for c in raw.get("coils", []):
+        pw = (
+            float(c["pulse_power_w"])
+            if power_default is None
+            else float(c.get("pulse_power_w", power_default))
+        )
+        coils.append(
+            dict(
+                name=c["name"],
+                wire_mm=float(c["wire_mm"]),
+                loop_mm=float(c["loop_mm"]),
+                turns=int(c["turns"]),
+                pulse_power_w=pw,
+                position_m=tuple(float(v) for v in c["position_m"]),
+                normal=tuple(float(v) for v in c["normal"]),
+                helix_height_mm=float(c.get("helix_height_mm", 0.0)),
+                segments_per_turn=int(c.get("segments_per_turn", 0)),
+            )
+        )
+    return coils
 
 
 # ---------------------------------------------------------------------------
@@ -115,12 +155,8 @@ def load_multicoil_config(path: str | os.PathLike | None = None) -> dict:
     with open(path) as f:
         raw = yaml.safe_load(f)
 
-    # --- target ---
-    tgt = raw.get("target", {})
-    target = dict(
-        name=tgt.get("name", "unknown"),
-        position_m=tuple(float(v) for v in tgt.get("position_m", [0, 0, 0])),
-    )
+    target = _parse_target(raw)
+    coils = _parse_coils(raw)
 
     # --- safety ---
     safety = raw.get("safety", {})
@@ -131,26 +167,40 @@ def load_multicoil_config(path: str | os.PathLike | None = None) -> dict:
     geom = raw.get("geometry", {})
     skull_radius_m = float(geom.get("skull_radius_m", 0.09))
 
-    # --- coils ---
-    coils_spec = raw.get("coils", [])
-    coils = []
-    for c in coils_spec:
-        coils.append(dict(
-            name=c["name"],
-            wire_mm=float(c["wire_mm"]),
-            loop_mm=float(c["loop_mm"]),
-            turns=int(c["turns"]),
-            pulse_power_w=float(c["pulse_power_w"]),
-            position_m=tuple(float(v) for v in c["position_m"]),
-            normal=tuple(float(v) for v in c["normal"]),
-        ))
-
     # --- simulation ---
     sim = raw.get("simulation", {})
     therm = raw.get("thermal", {})
     depth = raw.get("depth", {})
 
-    return {
+    # --- ANSYS integration (optional) ---
+    # New unified `ansys` block with `mode: "file"/"live"`.
+    # Backward compat: old `ansys_field_maps` key maps to mode: "file".
+    ansys_block = raw.get("ansys")
+    old_ansys = raw.get("ansys_field_maps")
+
+    ansys_mode: str | None = None
+    ansys_field_maps: dict | None = None
+    ansys_connection: dict | None = None
+
+    if ansys_block:
+        ansys_mode = str(ansys_block.get("mode", "file")).lower()
+        if ansys_mode == "file":
+            fm = ansys_block.get("field_maps", {})
+            ansys_field_maps = {
+                "reference_current_a": float(fm.get("reference_current_a", 1.0)),
+                "coil_maps": {str(k): str(v) for k, v in fm.get("coil_maps", {}).items()},
+            }
+        elif ansys_mode == "live":
+            ansys_connection = dict(ansys_block.get("connection", {}))
+    elif old_ansys:
+        # Backward compatibility: old ansys_field_maps key → file mode
+        ansys_mode = "file"
+        ansys_field_maps = {
+            "reference_current_a": float(old_ansys.get("reference_current_a", 1.0)),
+            "coil_maps": {str(k): str(v) for k, v in old_ansys.get("coil_maps", {}).items()},
+        }
+
+    result: dict = {
         "target": target,
         "coils": coils,
         "cortical_max_vm": cortical_max_vm,
@@ -168,6 +218,13 @@ def load_multicoil_config(path: str | os.PathLike | None = None) -> dict:
         "z_points": int(depth.get("z_points", 500)),
         "b_threshold_t": float(depth.get("b_threshold_t", 1e-4)),
     }
+    if ansys_mode is not None:
+        result["ansys_mode"] = ansys_mode
+    if ansys_field_maps is not None:
+        result["ansys_field_maps"] = ansys_field_maps
+    if ansys_connection is not None:
+        result["ansys_connection"] = ansys_connection
+    return result
 
 
 def load_pulsed_config(path: str | os.PathLike | None = None) -> dict:
@@ -201,27 +258,11 @@ def load_pulsed_config(path: str | os.PathLike | None = None) -> dict:
     with open(path) as f:
         raw = yaml.safe_load(f)
 
-    # Reuse multicoil base sections
-    tgt = raw.get("target", {})
-    target = dict(
-        name=tgt.get("name", "unknown"),
-        position_m=tuple(float(v) for v in tgt.get("position_m", [0, 0, 0])),
-    )
+    target = _parse_target(raw)
+    coils = _parse_coils(raw, power_default=0.0)
 
     safety = raw.get("safety", {})
     geom = raw.get("geometry", {})
-    coils_spec = raw.get("coils", [])
-    coils = []
-    for c in coils_spec:
-        coils.append(dict(
-            name=c["name"],
-            wire_mm=float(c["wire_mm"]),
-            loop_mm=float(c["loop_mm"]),
-            turns=int(c["turns"]),
-            pulse_power_w=float(c.get("pulse_power_w", 0.0)),
-            position_m=tuple(float(v) for v in c["position_m"]),
-            normal=tuple(float(v) for v in c["normal"]),
-        ))
 
     cap = raw.get("capacitor", {})
     sim = raw.get("simulation", {})
@@ -249,13 +290,28 @@ def load_pulsed_config(path: str | os.PathLike | None = None) -> dict:
     }
 
 
-def build_multicoil_objects(config: dict):
+def build_multicoil_objects(config: dict, config_path: Optional[Union[str, Path]] = None):
     """
     Convenience: turn the flat dict from :func:`load_multicoil_config` into
     ready-to-use ``(MulticoilArray, flat_config)`` for the simulation.
 
-    The returned *flat_config* is the same dict, suitable for passing to
-    :func:`run_multicoil_simulation`.
+    If the config contains an ``ansys_field_maps`` section and the CSV files
+    exist, the corresponding :class:`~neuroregen.ansys_field_map.AnsysFieldMap`
+    objects are loaded and attached to the array.  CSV paths that are relative
+    are resolved relative to *config_path*'s directory (or the project root if
+    *config_path* is ``None``).
+
+    Parameters
+    ----------
+    config : dict
+        Flat config dict from :func:`load_multicoil_config`.
+    config_path : str or Path, optional
+        Path to the YAML file that produced *config*.  Used to resolve
+        relative CSV paths for ANSYS exports.
+
+    Returns
+    -------
+    (MulticoilArray, config)  – the array and the same flat config dict.
     """
     from .multicoil import Coil, Target, MulticoilArray
 
@@ -272,13 +328,41 @@ def build_multicoil_objects(config: dict):
             pulse_power_w=c["pulse_power_w"],
             position_m=c["position_m"],
             normal=c["normal"],
+            helix_height_mm=c.get("helix_height_mm", 0.0),
+            segments_per_turn=c.get("segments_per_turn", 0),
         )
         for c in config["coils"]
     ]
+
+    # --- ANSYS field maps ---------------------------------------------------
+    field_maps = None
+    ansys_mode = config.get("ansys_mode")
+
+    if ansys_mode == "live":
+        from .ansys_connection import AnsysLiveConnection
+
+        conn = AnsysLiveConnection(
+            coils=config["coils"],
+            target=config["target"],
+            connection_config=config.get("ansys_connection", {}),
+        )
+        field_maps = conn.connect_and_solve()
+
+    elif ansys_mode == "file" and "ansys_field_maps" in config:
+        from .ansys_field_map import load_ansys_field_maps
+
+        if config_path is not None:
+            base_dir = Path(config_path).resolve().parent
+        else:
+            base_dir = _project_root()
+
+        field_maps = load_ansys_field_maps(config, base_dir=base_dir)
+
     array = MulticoilArray(
         coils=coils,
         target=target,
         cortical_max_vm=config["cortical_max_vm"],
         surface_distance_m=config["scalp_to_cortex_m"],
+        field_maps=field_maps,
     )
     return array, config

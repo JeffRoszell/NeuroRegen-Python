@@ -11,19 +11,15 @@ HYST_C = f_to_c(TEMP_LIMIT_F - HYST_F)
 
 
 def thermal_gate_update(
-    T_prev: float, gated_off: bool, limit_c: float | None = None, hyst_c: float | None = None
+    T_prev: float, gated_off: bool, limit_c: float = LIMIT_C, hyst_c: float = HYST_C
 ) -> bool:
     """
     Update gated_off for next step.
     - If T_prev >= limit_c → return True (gated off, skip pulse).
     - If T_prev < hyst_c → return False (resume).
     - Else → keep current state (hysteresis band).
-    limit_c/hyst_c None → use constants (TEMP_LIMIT_F, HYST_F).
+    limit_c/hyst_c default to module-level LIMIT_C / HYST_C.
     """
-    if limit_c is None:
-        limit_c = LIMIT_C
-    if hyst_c is None:
-        hyst_c = HYST_C
     if T_prev >= limit_c:
         return True
     if T_prev < hyst_c:
@@ -36,10 +32,6 @@ def temp_step(T_prev: float, Pin: float, Pcool: float, Cth: float, dt: float) ->
     return T_prev + (Pin - Pcool) / Cth * dt
 
 
-def cooling_power(
-    T: float, S: float, h_conv: float | None = None, t_amb_c: float | None = None
-) -> float:
+def cooling_power(T: float, S: float, h_conv: float = H_CONV, t_amb_c: float = T_AMB_C) -> float:
     """Convective cooling power (W) at temperature T (°C), surface S (m²)."""
-    h = H_CONV if h_conv is None else h_conv
-    t_amb = T_AMB_C if t_amb_c is None else t_amb_c
-    return h * S * (T - t_amb)
+    return h_conv * S * (T - t_amb_c)

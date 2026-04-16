@@ -8,7 +8,6 @@ import sys
 import os
 
 import numpy as np
-import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -81,8 +80,8 @@ class TestDischargeParams:
     def test_reference_numbers(self):
         """Verify reference values from design analysis."""
         d = discharge_params(**self.PARAMS)
-        assert 10000 < d["I_peak_A"] < 15000    # ~11 500 A
-        assert 100e-6 < d["tau_s"] < 200e-6      # ~137 µs
+        assert 10000 < d["I_peak_A"] < 15000  # ~11 500 A
+        assert 100e-6 < d["tau_s"] < 200e-6  # ~137 µs
         assert abs(d["E_pulse_J"] - 625.0) < 0.1  # exactly 625 J
 
 
@@ -98,7 +97,7 @@ class TestMaxRepRate:
     def test_three_coil_budget(self):
         """3 coils × 625 J at 1 Hz requires ~2206 W (just above 2200 W)."""
         f = max_rep_rate(3 * 625.0, 2200.0, efficiency=0.85)
-        assert abs(f - 1.0) < 0.01   # should be ≈ 0.99 Hz
+        assert abs(f - 1.0) < 0.01  # should be ≈ 0.99 Hz
 
 
 # ---------------------------------------------------------------------------

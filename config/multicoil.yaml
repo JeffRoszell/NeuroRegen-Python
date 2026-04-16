@@ -35,34 +35,33 @@ geometry:
 #   Coil C (posterior)  ≈  9.3 cm  — shortest path
 
 coils:
+  # Geometry matches the ANSYS AEDT build: 6-turn / 150 mm / 10 mm wire
+  # pulse_power_w is the base power for distance-compensation weighting only
   - name: A
-    wire_mm: 1.2
-    loop_mm: 80
-    turns: 20
-    pulse_power_w: 60
+    wire_mm: 10.0
+    loop_mm: 150.0
+    turns: 6
+    pulse_power_w: 1000
     # Superior / vertex position
     position_m: [-0.010, -0.010, 0.088]
-    # Normal aimed at STN (direction from coil to target, normalised)
     normal: [-0.016, -0.023, -1.000]
 
   - name: B
-    wire_mm: 1.2
-    loop_mm: 80
-    turns: 20
-    pulse_power_w: 60
+    wire_mm: 10.0
+    loop_mm: 150.0
+    turns: 6
+    pulse_power_w: 1000
     # Right-lateral / temporal position
     position_m: [0.085, -0.020, 0.025]
-    # Normal aimed at STN (direction from coil to target, normalised)
     normal: [-0.829, 0.060, -0.556]
 
   - name: C
-    wire_mm: 1.2
-    loop_mm: 80
-    turns: 20
-    pulse_power_w: 60
+    wire_mm: 10.0
+    loop_mm: 150.0
+    turns: 6
+    pulse_power_w: 1000
     # Posterior / occipital position
     position_m: [-0.015, -0.088, 0.015]
-    # Normal aimed at STN (direction from coil to target, normalised)
     normal: [0.032, 0.806, -0.591]
 
 # --- Simulation timing ----------------------------------------------------
@@ -84,3 +83,42 @@ depth:
   z_max_m: 0.12         # max depth evaluated (m) — 12 cm for deep target
   z_points: 500         # grid resolution along depth axis
   b_threshold_t: 1.0e-4 # B-field threshold (T) for effective stimulation
+
+# --- ANSYS Maxwell integration (optional) ---------------------------------
+#
+# Two modes are supported:
+#
+#   mode: "file"  — Load B/E fields from CSV files exported from ANSYS Maxwell.
+#                   Points outside the exported domain fall back to analytical.
+#
+#   mode: "live"  — Use pyaedt to drive ANSYS Maxwell 3D directly, build
+#                   coil geometry, solve, and extract fields in memory.
+#                   Requires pyaedt + an ANSYS Electronics Desktop licence.
+#
+# Uncomment the ansys block and set mode to activate.  When absent,
+# the simulation uses the analytical Biot-Savart approximation only.
+#
+# Backward compatibility: the old `ansys_field_maps` key is still supported
+# and is treated as mode: "file" automatically.
+#
+# ansys:
+#   mode: "file"                   # "file" (CSV upload) or "live" (pyaedt)
+#
+#   # --- File mode settings (CSV upload) ---
+#   field_maps:
+#     reference_current_a: 1.0     # A — current used in the ANSYS solve
+#     coil_maps:
+#       A: ansys_exports/coil_A.csv
+#       B: ansys_exports/coil_B.csv
+#       C: ansys_exports/coil_C.csv
+#
+#   # --- Live mode settings (pyaedt connection) ---
+#   connection:
+#     version: "2024.1"
+#     non_graphical: true
+#     export_grid_spacing_mm: 3.0
+#     reference_current_a: 1.0
+#     head_model:
+#       scalp_radius_m: 0.095
+#       skull_radius_m: 0.090
+#       brain_radius_m: 0.080

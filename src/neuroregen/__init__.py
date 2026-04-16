@@ -19,7 +19,14 @@ from .plotting import plot_and_save, live_plot_init
 from .state_machine import ControllerState
 from .controller import Controller
 from .csv_logger import open_log
-from .config_loader import load_config, load_multicoil_config, build_multicoil_objects, load_pulsed_config
+from .config_loader import (
+    load_config,
+    load_multicoil_config,
+    build_multicoil_objects,
+    load_pulsed_config,
+)
+from .ansys_field_map import AnsysFieldMap, load_ansys_field_maps
+from .ansys_connection import AnsysLiveConnection, AnsysLiveFieldMap
 from .field_mapping import (
     B_field_3d_loop,
     B_magnitude_3d,
@@ -106,6 +113,11 @@ __all__ = [
     "Z_MAX_M",
     "Z_POINTS",
     "B_THRESHOLD_T",
+    # --- ANSYS integration ---
+    "AnsysFieldMap",
+    "load_ansys_field_maps",
+    "AnsysLiveConnection",
+    "AnsysLiveFieldMap",
     # --- multicoil ---
     "load_multicoil_config",
     "build_multicoil_objects",

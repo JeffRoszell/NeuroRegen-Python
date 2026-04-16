@@ -1,17 +1,15 @@
 # NeuroRegen — Pulsed TMS capacitor-discharge configuration
 #
-# Same coil positions as multicoil.yaml but with a larger coil geometry
-# (6 turns, 150 mm loop, 10 mm wire) suited to capacitor-discharge currents.
+# 3-coil sweet spot: 798V / 10Hz / single 110V/20A outlet
 #
 # Physics baseline:
 #   L  ≈  9.5 µH  (Neumann formula, single loop ≈ 0.26 µH, ×N² = ×36)
-#   I_peak ≈ 11 500 A    (V √(C/L))
+#   I_peak ≈ 3 674 A     (V √(C/L))
 #   τ  ≈  137 µs         (π √(LC))
-#   E_pulse ≈ 625 J      (½ C V²  per coil)
-#   f_max ≈ 0.99 Hz      (3 coils × 625 J / (2 200 W × 0.85))
-#
-# SAFETY NOTE: cortical E-field >> 150 V/m at these currents.
-# The depth gate will suppress pulses unless cortical_max_vm is raised.
+#   E_pulse ≈ 63.8 J     (½ C V²  per coil)
+#   f_max ≈ 9.8 Hz       (3 coils × 63.8 J / (2 200 W × 0.85))
+#   Cortex E ≈ 150 V/m   (at safety limit — maximum safe per-pulse field)
+#   STN E   ≈ 18.5 V/m   (r=20mm, 3 coils superposed)
 
 # --- Stimulation target ---------------------------------------------------
 target:
@@ -26,17 +24,20 @@ safety:
 # --- Capacitor bank -------------------------------------------------------
 capacitor:
   capacitance_f: 200.0e-6      # 200 µF (per coil, independently switched)
-  charge_voltage_v: 2500.0     # 2.5 kV charge voltage
+  charge_voltage_v: 798.0      # 0.8 kV — sweet spot: cortex at 150 V/m
 
 # --- Coil array -----------------------------------------------------------
-# Larger coils than multicoil.yaml — 150 mm / 6-turn / 10 mm wire.
-# Same skull-surface positions and target normals.
+# 3 coils on skull surface, all 150mm / 6-turn / 10mm wire.
+# Distances to STN_left:
+#   Coil A (vertex)     ≈ 12.8 cm
+#   Coil B (lateral R)  ≈ 11.7 cm
+#   Coil C (posterior)  ≈  9.3 cm
 coils:
   - name: A
     wire_mm: 10.0
     loop_mm: 150.0
     turns: 6
-    pulse_power_w: 0            # unused in pulsed mode (current is set by C, V, L)
+    pulse_power_w: 0
     position_m: [-0.010, -0.010, 0.088]
     normal: [-0.016, -0.023, -1.000]
 
@@ -58,8 +59,8 @@ coils:
 
 # --- Simulation -----------------------------------------------------------
 simulation:
-  n_pulses: 60                 # number of pulse events to simulate
-  pulse_freq: 1.0              # repetition rate (Hz)
+  n_pulses: 600                # 60 seconds at 10 Hz
+  pulse_freq: 10.0             # 10 Hz — standard facilitatory rTMS
   dt_between_pulses: 0.001     # cooling integration step between pulses (s)
 
 # --- Thermal limits -------------------------------------------------------

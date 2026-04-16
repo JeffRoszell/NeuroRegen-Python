@@ -1,0 +1,38 @@
+repos:
+  # Ruff — lint + format (scoped to project dirs)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.10
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^(src|scripts|tests)/
+      - id: ruff-format
+        files: ^(src|scripts|tests)/
+
+  # Spell check
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+        args:
+          - --skip=*.csv,*.json,*.html,*.yaml,*.toml,venv/*,outputs/*,.git/*
+          - --ignore-words-list=nd,ND,te,TE
+
+  # Tests
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: venv/bin/python -m pytest tests/ -q --tb=short
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+  # Conventional commit message
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.0.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert]

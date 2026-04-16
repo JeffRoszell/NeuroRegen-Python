@@ -19,17 +19,23 @@ depth:
 
 axes:
   - name: X
-    wire_mm: 1.2
-    loop_mm: 80
+    wire_mm: 0.60
+    loop_mm: 20.0
     turns: 20
-    pulse_power_w: 45
+    helix_height_mm: 9.5
+    segments_per_turn: 96
+    pulse_power_w: 1000
   - name: Y
-    wire_mm: 1.2
-    loop_mm: 80
+    wire_mm: 0.60
+    loop_mm: 26.0
     turns: 20
-    pulse_power_w: 45
+    helix_height_mm: 9.5
+    segments_per_turn: 96
+    pulse_power_w: 1000
   - name: Z
-    wire_mm: 1.2
-    loop_mm: 80
+    wire_mm: 0.60
+    loop_mm: 32.0
     turns: 20
-    pulse_power_w: 45
+    helix_height_mm: 9.5
+    segments_per_turn: 96
+    pulse_power_w: 1000

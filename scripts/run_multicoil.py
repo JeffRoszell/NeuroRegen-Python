@@ -48,8 +48,14 @@ from src.neuroregen.coil import c_to_f
 # ---------------------------------------------------------------------------
 def _colours(n: int) -> list[str]:
     palette = [
-        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728",
-        "#9467bd", "#8c564b", "#e377c2", "#7f7f7f",
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
     ]
     return [palette[i % len(palette)] for i in range(n)]
 
@@ -81,17 +87,16 @@ def _rolling_stats(
     """
     t_mid, means, lo, hi = [], [], [], []
     start = 0
-    while start < len(t_sec):
-        end = start
+    n = len(t_sec)
+    while start < n:
         t0 = t_sec[start]
-        while end < len(t_sec) and t_sec[end] < t0 + window_sec:
-            end += 1
+        end = int(np.searchsorted(t_sec, t0 + window_sec, side="left"))
+        end = max(end, start + 1)  # at least one element
         chunk = values[start:end]
-        if len(chunk):
-            t_mid.append((t0 + t_sec[min(end, len(t_sec)) - 1]) / 2)
-            means.append(float(np.mean(chunk)))
-            lo.append(float(np.min(chunk)))
-            hi.append(float(np.max(chunk)))
+        t_mid.append((t0 + t_sec[end - 1]) / 2)
+        means.append(float(np.mean(chunk)))
+        lo.append(float(np.min(chunk)))
+        hi.append(float(np.max(chunk)))
         start = end
     return np.array(t_mid), np.array(means), np.array(lo), np.array(hi)
 
@@ -128,10 +133,8 @@ def plot_multicoil_results(
         tm, mean, _lo, _hi = _rolling_stats(t_sec, temp_f, win)
         sty = _per_coil_style(i)
         ax.plot(tm / 60, mean, label=f"Coil {names[i]}", color=colors[i], **sty)
-    ax.axhline(limit_f, ls="--", color="red", linewidth=1.5,
-               label=f"Limit {limit_f}°F")
-    ax.axhline(resume_f, ls=":", color="orange", linewidth=1,
-               label=f"Resume {resume_f:.1f}°F")
+    ax.axhline(limit_f, ls="--", color="red", linewidth=1.5, label=f"Limit {limit_f}°F")
+    ax.axhline(resume_f, ls=":", color="orange", linewidth=1, label=f"Resume {resume_f:.1f}°F")
     ax.set_ylabel("Temperature (°F)")
     ax.set_title("Per-Coil Temperature (1-min average)", fontweight="bold")
     ax.legend(fontsize=9, framealpha=0.9)
@@ -144,8 +147,7 @@ def plot_multicoil_results(
         sty = _per_coil_style(i)
         ax.plot(tm / 60, hi, label=f"Coil {names[i]}", color=colors[i], **sty)
     ax.set_ylabel("Pulse Power (W)")
-    ax.set_title("Per-Coil Weighted Power During Pulses",
-                 fontweight="bold")
+    ax.set_title("Per-Coil Weighted Power During Pulses", fontweight="bold")
     ax.legend(fontsize=9, framealpha=0.9)
     ax.grid(True, alpha=0.3)
 
@@ -153,15 +155,20 @@ def plot_multicoil_results(
     ax = axes[1, 0]
     B_mT = results["B_target"] * 1000
     tm, _m, _lo, hi = _rolling_stats(t_sec, B_mT, win)
-    ax.plot(tm / 60, hi, color="#2ca02c", linewidth=2.0,
-            label="Peak |B| during pulses")
+    ax.plot(tm / 60, hi, color="#2ca02c", linewidth=2.0, label="Peak |B| during pulses")
     b_thresh = config.get("b_threshold_t", 1e-4)
-    ax.axhline(b_thresh * 1000, ls="--", color="red", linewidth=1.5,
-               label=f"Threshold {b_thresh*1000:.2f} mT")
+    ax.axhline(
+        b_thresh * 1000,
+        ls="--",
+        color="red",
+        linewidth=1.5,
+        label=f"Threshold {b_thresh * 1000:.2f} mT",
+    )
     ax.set_ylabel("|B| at target (mT)")
     ax.set_xlabel("Time (min)")
     ax.set_title(
-        f"Superposed B-Field at {array.target.name}", fontweight="bold",
+        f"Superposed B-Field at {array.target.name}",
+        fontweight="bold",
     )
     ax.legend(fontsize=9, framealpha=0.9)
     ax.grid(True, alpha=0.3)
@@ -172,8 +179,7 @@ def plot_multicoil_results(
     for i in range(nc):
         tm, mean, lo, hi = _rolling_stats(t_sec, results["E_surface"][:, i], win)
         sty = _per_coil_style(i)
-        ax.plot(tm / 60, hi, label=f"Coil {names[i]} (peak)",
-                color=colors[i], **sty)
+        ax.plot(tm / 60, hi, label=f"Coil {names[i]} (peak)", color=colors[i], **sty)
         if len(hi) > 0:
             e_max_global = max(e_max_global, float(np.max(hi)))
 
@@ -183,14 +189,22 @@ def plot_multicoil_results(
         ax.set_ylim(bottom=0, top=y_top)
         ax.annotate(
             f"Safety limit: {safety_limit:.0f} V/m (well above range)",
-            xy=(0.98, 0.97), xycoords="axes fraction",
-            ha="right", va="top", fontsize=9, color="red",
-            bbox=dict(boxstyle="round,pad=0.3", fc="lightyellow",
-                      ec="red", alpha=0.85),
+            xy=(0.98, 0.97),
+            xycoords="axes fraction",
+            ha="right",
+            va="top",
+            fontsize=9,
+            color="red",
+            bbox=dict(boxstyle="round,pad=0.3", fc="lightyellow", ec="red", alpha=0.85),
         )
     else:
-        ax.axhline(safety_limit, ls="--", color="red", linewidth=2,
-                   label=f"Safety limit {safety_limit:.0f} V/m")
+        ax.axhline(
+            safety_limit,
+            ls="--",
+            color="red",
+            linewidth=2,
+            label=f"Safety limit {safety_limit:.0f} V/m",
+        )
 
     ax.set_ylabel("Peak Cortical E-field (V/m)")
     ax.set_xlabel("Time (min)")
@@ -204,12 +218,14 @@ def plot_multicoil_results(
         t_min_arr = t_sec / 60
         fail_t = t_min_arr[gate_fail]
         for a in axes.flat:
-            for ft in fail_t[::max(1, len(fail_t) // 20)]:
+            for ft in fail_t[:: max(1, len(fail_t) // 20)]:
                 a.axvline(ft, color="red", alpha=0.15, linewidth=0.5)
 
     plt.suptitle(
         f"Multicoil Stimulation — {nc} coils → {array.target.name}",
-        fontsize=15, fontweight="bold", y=1.01,
+        fontsize=15,
+        fontweight="bold",
+        y=1.01,
     )
     plt.tight_layout()
     path = os.path.join(output_dir, "multicoil_results.png")
@@ -251,7 +267,12 @@ def plot_field_focus(
 
     print("  Computing superposed field at target depth (this may take a moment)...")
     B_mag = superposed_B_on_grid(
-        array.coils, array.weighted_powers, temps, X, Y, Z,
+        array.coils,
+        array.weighted_powers,
+        temps,
+        X,
+        Y,
+        Z,
     )
 
     fig, ax = plt.subplots(figsize=(10, 9))
@@ -262,8 +283,11 @@ def plot_field_focus(
     levels = np.logspace(np.log10(vmin), np.log10(vmax), 25)
 
     cs = ax.contourf(
-        (X - tx) * 1000, (Y - ty) * 1000, B_mT,
-        levels=levels, cmap="inferno",
+        (X - tx) * 1000,
+        (Y - ty) * 1000,
+        B_mT,
+        levels=levels,
+        cmap="inferno",
     )
     plt.colorbar(cs, ax=ax, label="|B| (mT)")
 
@@ -272,15 +296,25 @@ def plot_field_focus(
     above = B_mT >= b_thresh
     if np.any(above):
         ax.contour(
-            (X - tx) * 1000, (Y - ty) * 1000, above.astype(float),
-            levels=[0.5], colors="cyan", linewidths=2, linestyles="--",
+            (X - tx) * 1000,
+            (Y - ty) * 1000,
+            above.astype(float),
+            levels=[0.5],
+            colors="cyan",
+            linewidths=2,
+            linestyles="--",
         )
 
     # Mark target
     ax.plot(0, 0, "w+", markersize=14, markeredgewidth=2)
     ax.annotate(
-        target.name, (0, 0), textcoords="offset points",
-        xytext=(10, 10), color="white", fontsize=11, fontweight="bold",
+        target.name,
+        (0, 0),
+        textcoords="offset points",
+        xytext=(10, 10),
+        color="white",
+        fontsize=11,
+        fontweight="bold",
     )
 
     # Mark coil projections
@@ -290,14 +324,18 @@ def plot_field_focus(
         if abs(cx) < span * 1000 and abs(cy) < span * 1000:
             ax.plot(cx, cy, "wo", markersize=8, markeredgewidth=1.5, fillstyle="none")
             ax.annotate(
-                coil.name, (cx, cy), textcoords="offset points",
-                xytext=(6, 6), color="white", fontsize=9,
+                coil.name,
+                (cx, cy),
+                textcoords="offset points",
+                xytext=(6, 6),
+                color="white",
+                fontsize=9,
             )
 
     ax.set_xlabel("X offset from target (mm)")
     ax.set_ylabel("Y offset from target (mm)")
     ax.set_title(
-        f"Superposed |B| at target depth (z = {tz*100:.1f} cm)\n"
+        f"Superposed |B| at target depth (z = {tz * 100:.1f} cm)\n"
         f"Cyan contour = effective threshold ({b_thresh:.2f} mT)",
         fontweight="bold",
     )
@@ -353,12 +391,17 @@ def plot_3d_geometry(
     Xg, Yg, Zg = np.meshgrid(xv, yv, zv, indexing="ij")
 
     # Mask to skull interior
-    R_grid = np.sqrt(Xg ** 2 + Yg ** 2 + Zg ** 2)
+    R_grid = np.sqrt(Xg**2 + Yg**2 + Zg**2)
     outside = R_grid > skull_r
 
     print("  Computing 3-D superposed field volume (this may take a moment)...")
     B_mag = superposed_B_on_grid(
-        array.coils, array.weighted_powers, temps, Xg, Yg, Zg,
+        array.coils,
+        array.weighted_powers,
+        temps,
+        Xg,
+        Yg,
+        Zg,
     )
     B_mag[outside] = 0.0  # zero out anything outside skull
 
@@ -387,13 +430,22 @@ def plot_3d_geometry(
             tri_j += [p1, p2]
             tri_k += [p2, p3]
 
-    traces.append(go.Mesh3d(
-        x=su, y=sv, z=sw,
-        i=tri_i, j=tri_j, k=tri_k,
-        color="lightblue", opacity=0.07,
-        name="Skull", legendgroup="skull", showlegend=True,
-        hoverinfo="skip",
-    ))
+    traces.append(
+        go.Mesh3d(
+            x=su,
+            y=sv,
+            z=sw,
+            i=tri_i,
+            j=tri_j,
+            k=tri_k,
+            color="lightblue",
+            opacity=0.07,
+            name="Skull",
+            legendgroup="skull",
+            showlegend=True,
+            hoverinfo="skip",
+        )
+    )
 
     # ---- 2. Focal field volume (coloured point cloud) ----------------------
     B_mT = B_mag * 1000  # convert to mT for display
@@ -419,27 +471,31 @@ def plot_3d_geometry(
         # Marker size proportional to field strength (3–8 px range)
         sz = 3 + 5 * (bs - bs.min()) / (bs.max() - bs.min() + 1e-9)
 
-        traces.append(go.Scatter3d(
-            x=xs, y=ys, z=zs,
-            mode="markers",
-            marker=dict(
-                size=sz,
-                color=bs,
-                colorscale="Hot",
-                cmin=floor_mT,
-                cmax=B_peak * 1e4,
-                opacity=0.6,
-                colorbar=dict(title="|B| (mT)", x=1.02),
-            ),
-            name=f"|B| field (>= {floor_mT:.1f} mT)",
-            legendgroup="field",
-            showlegend=True,
-            hovertemplate=(
-                "|B| = %{marker.color:.2f} mT<br>"
-                "x=%{x:.1f}, y=%{y:.1f}, z=%{z:.1f} cm"
-                "<extra></extra>"
-            ),
-        ))
+        traces.append(
+            go.Scatter3d(
+                x=xs,
+                y=ys,
+                z=zs,
+                mode="markers",
+                marker=dict(
+                    size=sz,
+                    color=bs,
+                    colorscale="Hot",
+                    cmin=floor_mT,
+                    cmax=B_peak * 1e4,
+                    opacity=0.6,
+                    colorbar=dict(title="|B| (mT)", x=1.02),
+                ),
+                name=f"|B| field (>= {floor_mT:.1f} mT)",
+                legendgroup="field",
+                showlegend=True,
+                hovertemplate=(
+                    "|B| = %{marker.color:.2f} mT<br>"
+                    "x=%{x:.1f}, y=%{y:.1f}, z=%{z:.1f} cm"
+                    "<extra></extra>"
+                ),
+            )
+        )
 
     # ---- 3. Coils — markers + cone arrows --------------------------------
     arrow_len = 3.0  # cm
@@ -450,90 +506,116 @@ def plot_3d_geometry(
 
         hover_text = (
             f"<b>Coil {coil.name}</b><br>"
-            f"Distance to target: {array.distances[i]*100:.1f} cm<br>"
+            f"Distance to target: {array.distances[i] * 100:.1f} cm<br>"
             f"cos(theta): {array.cosine_factors[i]:.3f}<br>"
             f"Weight: {array.weights[i]:.2f}<br>"
             f"Weighted power: {array.weighted_powers[i]:.1f} W"
         )
 
         # Coil position marker
-        traces.append(go.Scatter3d(
-            x=[cx], y=[cy], z=[cz],
-            mode="markers+text",
-            marker=dict(size=10, color=col, line=dict(width=2, color="black")),
-            text=[coil.name],
-            textposition="top center",
-            textfont=dict(size=14, color=col, family="Arial Black"),
-            name=f"Coil {coil.name}",
-            legendgroup=f"coil_{coil.name}",
-            showlegend=True,
-            hovertext=hover_text,
-            hoverinfo="text",
-        ))
+        traces.append(
+            go.Scatter3d(
+                x=[cx],
+                y=[cy],
+                z=[cz],
+                mode="markers+text",
+                marker=dict(size=10, color=col, line=dict(width=2, color="black")),
+                text=[coil.name],
+                textposition="top center",
+                textfont=dict(size=14, color=col, family="Arial Black"),
+                name=f"Coil {coil.name}",
+                legendgroup=f"coil_{coil.name}",
+                showlegend=True,
+                hovertext=hover_text,
+                hoverinfo="text",
+            )
+        )
 
         # Normal arrow (cone)
         tip_x = cx + nx * arrow_len
         tip_y = cy + ny * arrow_len
         tip_z = cz + nz * arrow_len
-        traces.append(go.Cone(
-            x=[tip_x], y=[tip_y], z=[tip_z],
-            u=[nx], v=[ny], w=[nz],
-            sizemode="absolute", sizeref=1.5,
-            anchor="tip", showscale=False,
-            colorscale=[[0, col], [1, col]],
-            name=f"Coil {coil.name} normal",
-            legendgroup=f"coil_{coil.name}",
-            showlegend=False,
-            hoverinfo="skip",
-        ))
+        traces.append(
+            go.Cone(
+                x=[tip_x],
+                y=[tip_y],
+                z=[tip_z],
+                u=[nx],
+                v=[ny],
+                w=[nz],
+                sizemode="absolute",
+                sizeref=1.5,
+                anchor="tip",
+                showscale=False,
+                colorscale=[[0, col], [1, col]],
+                name=f"Coil {coil.name} normal",
+                legendgroup=f"coil_{coil.name}",
+                showlegend=False,
+                hoverinfo="skip",
+            )
+        )
 
         # Shaft of the arrow (line from coil to cone tip)
-        traces.append(go.Scatter3d(
-            x=[cx, tip_x], y=[cy, tip_y], z=[cz, tip_z],
-            mode="lines",
-            line=dict(color=col, width=5),
-            legendgroup=f"coil_{coil.name}",
-            showlegend=False,
-            hoverinfo="skip",
-        ))
+        traces.append(
+            go.Scatter3d(
+                x=[cx, tip_x],
+                y=[cy, tip_y],
+                z=[cz, tip_z],
+                mode="lines",
+                line=dict(color=col, width=5),
+                legendgroup=f"coil_{coil.name}",
+                showlegend=False,
+                hoverinfo="skip",
+            )
+        )
 
     # ---- 4. Target marker ------------------------------------------------
     ttx, tty, ttz = [p * 100 for p in target.position_m]
     target_hover = (
         f"<b>{target.name}</b><br>"
         f"Position: ({ttx:.1f}, {tty:.1f}, {ttz:.1f}) cm<br>"
-        f"Combined |B|: {B_at_tgt*1000:.2f} mT"
+        f"Combined |B|: {B_at_tgt * 1000:.2f} mT"
     )
-    traces.append(go.Scatter3d(
-        x=[ttx], y=[tty], z=[ttz],
-        mode="markers+text",
-        marker=dict(
-            size=12, color="red", symbol="diamond",
-            line=dict(width=2, color="darkred"),
-        ),
-        text=[target.name],
-        textposition="bottom center",
-        textfont=dict(size=14, color="red", family="Arial Black"),
-        name=target.name,
-        legendgroup="target",
-        showlegend=True,
-        hovertext=target_hover,
-        hoverinfo="text",
-    ))
+    traces.append(
+        go.Scatter3d(
+            x=[ttx],
+            y=[tty],
+            z=[ttz],
+            mode="markers+text",
+            marker=dict(
+                size=12,
+                color="red",
+                symbol="diamond",
+                line=dict(width=2, color="darkred"),
+            ),
+            text=[target.name],
+            textposition="bottom center",
+            textfont=dict(size=14, color="red", family="Arial Black"),
+            name=target.name,
+            legendgroup="target",
+            showlegend=True,
+            hovertext=target_hover,
+            hoverinfo="text",
+        )
+    )
 
     # ---- 5. Beam lines (coil → target) -----------------------------------
     for i, coil in enumerate(array.coils):
         cx, cy, cz = [p * 100 for p in coil.position_m]
         col = coil_colors[i]
-        traces.append(go.Scatter3d(
-            x=[cx, ttx], y=[cy, tty], z=[cz, ttz],
-            mode="lines",
-            line=dict(color=col, width=3, dash="dash"),
-            name=f"{coil.name} → target",
-            legendgroup=f"beam_{coil.name}",
-            showlegend=True,
-            hoverinfo="skip",
-        ))
+        traces.append(
+            go.Scatter3d(
+                x=[cx, ttx],
+                y=[cy, tty],
+                z=[cz, ttz],
+                mode="lines",
+                line=dict(color=col, width=3, dash="dash"),
+                name=f"{coil.name} → target",
+                legendgroup=f"beam_{coil.name}",
+                showlegend=True,
+                hoverinfo="skip",
+            )
+        )
 
     # ---- Layout ----------------------------------------------------------
     lim = skull_r * 100 * 1.15
@@ -542,8 +624,8 @@ def plot_3d_geometry(
         title=dict(
             text=(
                 f"Multicoil Array — {nc} coils → {target.name}<br>"
-                f"<sup>Skull Ø {skull_r*200:.0f} cm  |  "
-                f"Combined B at target: {B_at_tgt*1000:.2f} mT</sup>"
+                f"<sup>Skull Ø {skull_r * 200:.0f} cm  |  "
+                f"Combined B at target: {B_at_tgt * 1000:.2f} mT</sup>"
             ),
             font=dict(size=18),
         ),
@@ -555,8 +637,10 @@ def plot_3d_geometry(
             camera=dict(eye=dict(x=1.4, y=-1.4, z=0.9)),
         ),
         legend=dict(
-            yanchor="top", y=0.98,
-            xanchor="left", x=0.01,
+            yanchor="top",
+            y=0.98,
+            xanchor="left",
+            x=0.01,
             bgcolor="rgba(255,255,255,0.8)",
             font=dict(size=11),
         ),
@@ -590,19 +674,25 @@ def main():
         description="Run NeuroRegen multicoil deep-brain stimulation simulation.",
     )
     parser.add_argument(
-        "-c", "--config", default=None,
+        "-c",
+        "--config",
+        default=None,
         help="Path to multicoil YAML config (default: config/multicoil.yaml)",
     )
     parser.add_argument(
-        "--field-map", action="store_true",
+        "--field-map",
+        action="store_true",
         help="Generate 2-D superposed field focus plot at target depth",
     )
     parser.add_argument(
-        "--3d", dest="plot_3d", action="store_true",
+        "--3d",
+        dest="plot_3d",
+        action="store_true",
         help="Generate 3-D visualisation of coil array, skull, and field volume",
     )
     parser.add_argument(
-        "--no-show", action="store_true",
+        "--no-show",
+        action="store_true",
         help="Save plots but don't display them (for headless / CI runs)",
     )
     args = parser.parse_args()
@@ -628,9 +718,11 @@ def main():
 
     # ---- run simulation ----
     print("\nRunning multicoil simulation...")
-    print(f"  {array.n_coils} coils, {config['sim_time']:.0f}s, "
-          f"dt={config['dt']}s, {config['pulse_freq']} Hz, "
-          f"pulse_width={config['pulse_width']*1000:.0f} ms")
+    print(
+        f"  {array.n_coils} coils, {config['sim_time']:.0f}s, "
+        f"dt={config['dt']}s, {config['pulse_freq']} Hz, "
+        f"pulse_width={config['pulse_width'] * 1000:.0f} ms"
+    )
     results = run_multicoil_simulation(array, config)
     print("  Done.")
 
@@ -639,10 +731,12 @@ def main():
     total_steps = len(results["t"])
     B_peak = results["B_target"].max()
     E_peak = results["E_surface"].max()
-    print(f"\n  Peak |B| at target    : {B_peak*1000:.4f} mT")
+    print(f"\n  Peak |B| at target    : {B_peak * 1000:.4f} mT")
     print(f"  Peak cortical E-field : {E_peak:.2f} V/m")
-    print(f"  Depth-gate failures   : {gate_failures}/{total_steps} steps "
-          f"({gate_failures/total_steps*100:.1f}%)")
+    print(
+        f"  Depth-gate failures   : {gate_failures}/{total_steps} steps "
+        f"({gate_failures / total_steps * 100:.1f}%)"
+    )
 
     # ---- plots ----
     output_dir = os.path.join(ROOT, "outputs", "multicoil")

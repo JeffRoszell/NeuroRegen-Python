@@ -18,7 +18,11 @@ def test_controller_fault_on_over_temperature():
 
     # Temp limit just above ambient; high power and no cooling so we fault in a few steps
     temp_limit_f = 23.2  # ~73.8°F, just above 22°C ambient
-    hot_axes = [Axis("X", 1.2, 80, 20, 200), Axis("Y", 1.2, 80, 20, 200), Axis("Z", 1.2, 80, 20, 200)]
+    hot_axes = [
+        Axis("X", 1.2, 80, 20, 200),
+        Axis("Y", 1.2, 80, 20, 200),
+        Axis("Z", 1.2, 80, 20, 200),
+    ]
     config = {
         "sim_time": 120.0,
         "dt": 0.1,
