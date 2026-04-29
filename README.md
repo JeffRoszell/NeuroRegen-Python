@@ -97,6 +97,30 @@ python scripts/generate_ansys_sample.py
 
 ---
 
+## ANSYS Alternative — Pure-Python B-field Simulator
+
+Self-contained subproject in [`ansys_alternative/`](ansys_alternative/) that replaces ANSYS Maxwell for **outside-the-head** magnetic-field calculation and 3-D visualization of the 3-coil array. Cortical / deep-brain E-fields still go through SimNIBS.
+
+Stack: [magpylib](https://github.com/magpylib/magpylib) (analytical Biot–Savart), [PyVista](https://pyvista.org/) (VTK rendering), trimesh, PyYAML. Default coil block matches the validated Maxwell build (6 turns × 150 mm × 10 mm wire, 3 674 A peak).
+
+```bash
+cd ansys_alternative
+python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python simulate_bfield.py                          # interactive 3-D scene + field grid
+python simulate_bfield.py --no-show \              # headless export
+    --save-html outputs/scene.html \
+    --save-vti  outputs/bfield.vti
+python simulate_bfield.py --check-only             # coil/scalp standoff sanity check only
+```
+
+Keep its venv isolated from the main project's — different dependency set (magpylib, pyvista, trimesh).
+
+Docs: [`ansys_alternative/README.md`](ansys_alternative/README.md) · [QUICKSTART](ansys_alternative/docs/QUICKSTART.md) · [MANUAL](ansys_alternative/docs/MANUAL.md) · [VS_ANSYS](ansys_alternative/docs/VS_ANSYS.md)
+
+---
+
 ## Tests
 
 ```bash

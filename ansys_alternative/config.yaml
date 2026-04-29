@@ -1,0 +1,115 @@
+# NeuroRegen — External B-field simulator configuration
+#
+# Multipod 3-axis array — three compact 3-axis Tesla coil triplets ("pods")
+# placed at three scalp positions, all aimed at the deep STN target.
+#
+# Coil dimensions follow the Navarro de Lara et al. 2021 compact 3-axis
+# TMS coil (NeuroImage 224, 117355) — same family used by NeuroRegen's
+# default.yaml. With ~43 mm loop diameter the three pods are physically
+# small enough to sit on a real adult scalp without colliding with each
+# other or with the head.
+#
+# Each pod expands at load time into three orthogonal coils sharing one
+# position (offset outward from the scalp by `scalp_offset_m`):
+#   <pod>_z : radial (axis = pod normal, pointing toward the target)
+#   <pod>_x : first tangent  (in scalp plane)
+#   <pod>_y : second tangent (in scalp plane, ⊥ _x and _z)
+#
+# Other named configs in this folder:
+#   config_3axis_centered.yaml — single 3-axis triplet (150 mm, 6 turns)
+#                                at the head centre — the original X/Y/Z
+#                                Tesla layout. Load with -c.
+#
+# All lengths in METRES, currents in AMPERES, B-field outputs in TESLA.
+# Coordinate frame: head-centred (origin = geometric centre of skull).
+
+# -- Head mesh ---------------------------------------------------------------
+mesh:
+  path: "head_models/skin.stl"
+  scale_to_m: 1.0
+  translate_m: [0.0, 0.0, 0.0]
+
+# -- Stimulation target -----------------------------------------------------
+target:
+  name: STN_left
+  position_m: [-0.012, -0.013, -0.040]
+
+# -- Pod array ---------------------------------------------------------------
+# Common pod block (anchor — yaml anchors keep the per-axis coil specs in
+# sync without copy-paste).
+.pod_common: &pod_common
+  loop_diameter_m: 0.04285        # 42.85 mm — Navarro 2021, Fig 1A mean
+  wire_diameter_m: 0.002          # 2 mm Litz
+  turns: 18
+  helix_height_m: 0.008           # 8 mm — single-layer winding
+  segments_per_turn: 64
+  current_a: 1500.0               # plausible peak for 2 mm Litz at this duty
+  peak_dIdt_a_per_us: 14.5        # ≈ I_peak·π / 326 µs (Navarro pulse width)
+  geometry: "stacked"
+  scalp_offset_m: 0.025           # pod centre 25 mm clear of scalp surface
+
+pods:
+  - name: A           # vertex / superior
+    <<: *pod_common
+    position_m: [-0.010, -0.010, 0.088]
+    normal:     [-0.016, -0.023, -1.000]
+
+  - name: B           # right lateral / temporal
+    <<: *pod_common
+    position_m: [0.085, -0.020, 0.025]
+    normal:     [-0.829, 0.060, -0.556]
+
+  - name: C           # posterior / occipital
+    <<: *pod_common
+    position_m: [-0.015, -0.088, 0.015]
+    normal:     [0.032, 0.806, -0.591]
+
+# -- Observation grid (3-D ImageData around the head) ------------------------
+grid:
+  bounds_m:
+    xmin: -0.16
+    xmax:  0.16
+    ymin: -0.16
+    ymax:  0.16
+    zmin: -0.12
+    zmax:  0.16
+  spacing_m: 0.004                 # 4 mm — finer for compact coils
+
+# -- Visualisation -----------------------------------------------------------
+viz:
+  head_opacity: 0.25
+  coil_color: "orange"
+  log_color_scale: true
+  streamline_density: 360          # 9 coils, lots of room to fill
+  streamline_max_steps: 4000
+  slice_planes: ["x", "y", "z"]
+  show_target_marker: true
+  background: "white"
+
+# -- Safety / standoff -------------------------------------------------------
+safety:
+  skin_offset_m: 0.025             # match the pod scalp_offset_m
+  tolerance_m: 0.005
+  intersection_sample_points: 256
+
+# -- Physical constraint caps ------------------------------------------------
+# Used by `--check-constraints` and the optimizer. Caps below come from:
+#   E_scalp     : IEC 60601-2-33 / Reilly peripheral-nerve threshold
+#   E_cortex    : TMS resting-motor-threshold band, evaluated on a scalp
+#                 mesh offset inward by `cortex_offset_m` (cortical proxy)
+#   E_pulse     : Magstim-class single-bench cap-bank energy
+#   P_avg_wall  : 15 A US wall × 80 % derate / charger_efficiency
+#   P_thermal   : passive convection from a ~5 cm coil case
+limits:
+  e_max_scalp_v_per_m: 100.0
+  e_max_cortex_v_per_m: 150.0
+  cortex_offset_m: 0.012
+  max_pulse_energy_j: 200.0
+  max_avg_power_w: 1800.0
+  charger_efficiency: 0.85
+  prf_hz: 1.0
+  max_coil_dissipation_w: 50.0
+  wire_resistivity_ohm_m: 1.68e-8       # annealed copper, 20 °C
+  litz_skin_factor: 1.3                 # bundled-Litz penalty
+  in_phase_firing: true                 # all 9 coils peak simultaneously
+  pod_min_separation_m: 0.06            # centre-to-centre, prevents pod collapse
