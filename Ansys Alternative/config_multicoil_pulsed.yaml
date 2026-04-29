@@ -1,0 +1,126 @@
+# NeuroRegen — External B-field simulator configuration
+#
+# Mirrors the original Python Code multicoil + pulsed builds:
+#   Python Code/config/multicoil.yaml   — 3-coil array, distance compensation
+#   Python Code/config/pulsed_tms.yaml  — capacitor-discharge LC pulse
+#
+# 3 single coils (NOT 3-axis pods) at scalp anchors A/B/C, all aimed at the
+# deep STN target. Coil geometry matches the validated Maxwell3D build
+# 3AxisTeslaCoil_6Turns_10mmWire_150mmLargest_SeparateLeads_300mm_Apr15.aedt:
+#
+#   loop diameter   : 150 mm
+#   wire            : 10 mm solid copper (no Litz)
+#   turns           : 6
+#   helix height    : 35.7 mm
+#   peak current    : 3 674 A   (V √(C/L) for 200 µF / 798 V / 9.5 µH)
+#   pulse half-period τ : 137 µs   (π √(LC))
+#   peak dI/dt      : 84.3 A/μs   (I·π/τ)
+#   energy / pulse  : 63.8 J / coil   (½ C V²)
+#
+# Frame: head-centred, origin = geometric centre of skull. SI units.
+
+# -- Head mesh ---------------------------------------------------------------
+mesh:
+  path: "head_models/skin.stl"
+  scale_to_m: 1.0
+  translate_m: [0.0, 0.0, 0.0]
+
+# -- Stimulation target ------------------------------------------------------
+target:
+  name: STN_left
+  position_m: [-0.012, -0.013, -0.040]
+
+# -- Coil array --------------------------------------------------------------
+# Positions / normals copied verbatim from Python Code/config/multicoil.yaml.
+# Each coil's normal points inward toward the target (coil tilted to aim).
+coils:
+  - name: A           # superior / vertex
+    loop_diameter_m: 0.150
+    wire_diameter_m: 0.010
+    turns: 6
+    helix_height_m: 0.0357
+    segments_per_turn: 64
+    current_a: 3674.0
+    peak_dIdt_a_per_us: 84.3
+    geometry: "stacked"
+    position_m: [-0.010, -0.010, 0.088]
+    normal:     [-0.016, -0.023, -1.000]
+
+  - name: B           # right-lateral / temporal
+    loop_diameter_m: 0.150
+    wire_diameter_m: 0.010
+    turns: 6
+    helix_height_m: 0.0357
+    segments_per_turn: 64
+    current_a: 3674.0
+    peak_dIdt_a_per_us: 84.3
+    geometry: "stacked"
+    position_m: [0.085, -0.020, 0.025]
+    normal:     [-0.829, 0.060, -0.556]
+
+  - name: C           # posterior / occipital
+    loop_diameter_m: 0.150
+    wire_diameter_m: 0.010
+    turns: 6
+    helix_height_m: 0.0357
+    segments_per_turn: 64
+    current_a: 3674.0
+    peak_dIdt_a_per_us: 84.3
+    geometry: "stacked"
+    position_m: [-0.015, -0.088, 0.015]
+    normal:     [0.032, 0.806, -0.591]
+
+# -- Observation grid (3-D ImageData around the head) ------------------------
+grid:
+  bounds_m:
+    xmin: -0.16
+    xmax:  0.16
+    ymin: -0.16
+    ymax:  0.16
+    zmin: -0.12
+    zmax:  0.16
+  spacing_m: 0.005
+
+# -- Visualisation -----------------------------------------------------------
+viz:
+  head_opacity: 0.25
+  coil_color: "orange"
+  log_color_scale: true
+  streamline_density: 240
+  streamline_max_steps: 4000
+  slice_planes: ["x", "y", "z"]
+  show_target_marker: true
+  background: "white"
+
+# -- Safety / standoff -------------------------------------------------------
+safety:
+  skin_offset_m: 0.004                  # SimNIBS default (4 mm hair gap)
+  tolerance_m: 0.003
+  intersection_sample_points: 256
+
+# -- Physical constraint caps ------------------------------------------------
+# Mirrors Python Code safety blocks:
+#   multicoil.yaml.safety.cortical_max_vm   = 150.0 V/m
+#   multicoil.yaml.safety.scalp_to_cortex_m = 0.015 m
+#   pulsed_tms.yaml.simulation.pulse_freq   = 10.0 Hz  (we use 5 Hz from
+#                                                       multicoil — more
+#                                                       conservative)
+#   pulsed_tms.yaml.thermal.h_conv          = 10  (passive convection)
+#   pulsed_tms.yaml.thermal.temp_limit_f    = 105 °F  (40.6 °C, IEC 60601-1)
+#
+# The originals enforce only the cortical E cap. We keep an `e_max_scalp`
+# entry for the IEC 60601-2-33 PNS bound, but set it loose (1e9) so the
+# cortical cap is always the binding constraint — matching original intent.
+limits:
+  e_max_scalp_v_per_m: 1.0e9            # disabled — originals don't cap scalp E
+  e_max_cortex_v_per_m: 150.0           # multicoil/pulsed cortical_max_vm
+  cortex_offset_m: 0.015                # multicoil scalp_to_cortex_m
+  max_pulse_energy_j: 200.0             # 3 × 63.8 J ≈ 191 J fits comfortably
+  max_avg_power_w: 2200.0               # pulsed 110 V/20 A wall, derated
+  charger_efficiency: 0.85
+  prf_hz: 5.0                           # multicoil simulation.pulse_freq
+  max_coil_dissipation_w: 50.0          # passive convection per coil
+  wire_resistivity_ohm_m: 1.68e-8       # copper @ 20 °C
+  litz_skin_factor: 1.0                 # 10 mm solid wire, no Litz penalty
+  in_phase_firing: true
+  pod_min_separation_m: 0.06            # n/a (no pods); kept for loader

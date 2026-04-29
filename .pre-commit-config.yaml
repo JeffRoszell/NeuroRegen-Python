@@ -16,7 +16,7 @@ repos:
       - id: codespell
         args:
           - --skip=*.csv,*.json,*.html,*.yaml,*.toml,venv/*,outputs/*,.git/*
-          - --ignore-words-list=nd,ND,te,TE
+          - --ignore-words-list=nd,ND,te,TE,oint
 
   # Tests
   - repo: local
